@@ -39,9 +39,12 @@ export async function createPaymentIntent(bookingId: string, amount: number) {
       },
     })
 
+    console.log("PaymentIntent created:", paymentIntent.id, "Client Secret:", paymentIntent.client_secret)
+
     return {
       success: true,
       clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
     }
   } catch (error) {
     console.error("Error creating payment intent:", error)
