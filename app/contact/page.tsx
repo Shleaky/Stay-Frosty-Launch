@@ -241,7 +241,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold">Phone</h3>
-                      <p className="text-muted-foreground">(123) 456-7890</p>
+                      <p className="text-muted-foreground">(+61) 04 3891 4018</p>
                     </div>
                   </div>
 
@@ -251,7 +251,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold">Service Area</h3>
-                      <p className="text-muted-foreground">Greater Metro Area & Surrounding Cities</p>
+                      <p className="text-muted-foreground">Brisbane Greater Metro Area & Surrounding Cities</p>
                     </div>
                   </div>
                 </CardContent>
@@ -264,7 +264,7 @@ export default function ContactPage() {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
                     <span>Monday - Friday</span>
-                    <span className="text-slushie-green">9:00 AM - 6:00 PM</span>
+                    <span className="text-slushie-green">9:00 AM - 5:00 PM</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Saturday</span>
