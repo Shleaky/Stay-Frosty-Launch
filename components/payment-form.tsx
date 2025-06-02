@@ -71,18 +71,26 @@ export function PaymentForm({ bookingId, clientSecret }: PaymentFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement />
+    <div className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="p-4 border border-white/20 rounded-lg bg-black/30">
+          <PaymentElement
+            options={{
+              layout: "tabs",
+            }}
+          />
+        </div>
 
-      {paymentError && <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-500">{paymentError}</div>}
+        {paymentError && <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-500">{paymentError}</div>}
 
-      <Button
-        type="submit"
-        disabled={!stripe || isProcessing}
-        className="w-full bg-slushie-green hover:bg-slushie-green/80 text-black font-bold splash-button"
-      >
-        {isProcessing ? "Processing Payment..." : "Pay Now"}
-      </Button>
-    </form>
+        <Button
+          type="submit"
+          disabled={!stripe || isProcessing}
+          className="w-full bg-slushie-green hover:bg-slushie-green/80 text-black font-bold splash-button"
+        >
+          {isProcessing ? "Processing Payment..." : "Pay Now"}
+        </Button>
+      </form>
+    </div>
   )
 }

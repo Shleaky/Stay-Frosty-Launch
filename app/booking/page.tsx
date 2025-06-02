@@ -318,7 +318,7 @@ export default function BookingPage() {
                 {paymentClientSecret ? (
                   <div className="mt-6">
                     <h3 className="font-semibold mb-4">Payment Details</h3>
-                    <StripeProvider>
+                    <StripeProvider clientSecret={paymentClientSecret}>
                       <PaymentForm bookingId={bookingReference} clientSecret={paymentClientSecret} />
                     </StripeProvider>
                   </div>
