@@ -353,7 +353,7 @@ export default function ServicesPage() {
                   asChild
                   className="bg-slushie-green hover:bg-slushie-green/80 text-black font-bold splash-button"
                 >
-                  <Link href="/booking?addon=branded">Inquire Now</Link>
+                  <Link href="/contact?service=branded-cups">Inquire Now</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -366,7 +366,7 @@ export default function ServicesPage() {
                   brand colors.
                 </p>
                 <Button asChild className="bg-slushie-blue hover:bg-slushie-blue/80 text-white font-bold splash-button">
-                  <Link href="/booking?addon=custom-flavor">Inquire Now</Link>
+                  <Link href="/contact?service=custom-flavor">Inquire Now</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -379,7 +379,7 @@ export default function ServicesPage() {
                   flavors.
                 </p>
                 <Button asChild className="bg-slushie-pink hover:bg-slushie-pink/80 text-white font-bold splash-button">
-                  <Link href="/booking?addon=alcoholic">Inquire Now</Link>
+                  <Link href="/contact?service=alcoholic-options">Inquire Now</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -396,7 +396,7 @@ export default function ServicesPage() {
                   asChild
                   className="bg-gradient-to-r from-slushie-green to-slushie-blue hover:opacity-90 text-black font-bold splash-button"
                 >
-                  <Link href="/booking?addon=long-term">Inquire Now</Link>
+                  <Link href="/contact?service=long-term-rental">Inquire Now</Link>
                 </Button>
               </CardContent>
             </Card>
