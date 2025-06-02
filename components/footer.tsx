@@ -40,9 +40,6 @@ export default function Footer() {
             <a href="#" className="text-sm text-muted-foreground hover:text-white">
               Facebook
             </a>
-            <a href="#" className="text-sm text-muted-foreground hover:text-white">
-              Twitter
-            </a>
           </div>
         </div>
       </div>
