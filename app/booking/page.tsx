@@ -204,25 +204,64 @@ export default function BookingPage() {
         throw new Error("Please select a date")
       }
 
+      // Validate required fields before submission
+      if (!selectedMachine) {
+        throw new Error("Please select a machine type")
+      }
+      if (!selectedPackage) {
+        throw new Error("Please select a package type")
+      }
+      if (selectedFlavors.length === 0) {
+        throw new Error("Please select at least one flavor")
+      }
+      if (!eventType.trim()) {
+        throw new Error("Please enter an event type")
+      }
+      if (!guestCount || Number.parseInt(guestCount) <= 0) {
+        throw new Error("Please enter a valid guest count")
+      }
+      if (!name.trim()) {
+        throw new Error("Please enter your name")
+      }
+      if (!email.trim()) {
+        throw new Error("Please enter your email")
+      }
+      if (!phone.trim()) {
+        throw new Error("Please enter your phone number")
+      }
+      if (!address.trim()) {
+        throw new Error("Please enter the event address")
+      }
+
+      // Prepare booking data with proper types
       const bookingData = {
         userId: user?.id || null,
         bookingDate: selectedDate.toISOString(),
         machineType: selectedMachine,
         packageType: selectedPackage,
         flavors: selectedFlavors,
-        eventType: eventType,
-        guestCount: Number.parseInt(guestCount) || 0,
-        userName: name,
-        userEmail: email,
-        userPhone: phone,
-        address: address,
-        comments: comments,
+        eventType: eventType.trim(),
+        guestCount: Number.parseInt(guestCount),
+        userName: name.trim(),
+        userEmail: email.trim(),
+        userPhone: phone.trim(),
+        address: address.trim(),
+        comments: comments.trim() || undefined,
         totalPrice: calculateTotal(),
       }
+
+      console.log("Booking data being sent:", bookingData)
 
       const result = await createSlushieBooking(bookingData)
 
       if (!result.success) {
+        if (result.validationErrors) {
+          console.error("Validation errors:", result.validationErrors)
+          const errorMessages = Object.entries(result.validationErrors)
+            .map(([field, errors]) => `${field}: ${errors.join(", ")}`)
+            .join("\n")
+          throw new Error(`Validation failed:\n${errorMessages}`)
+        }
         throw new Error(result.error || "Failed to create booking")
       }
 
@@ -517,6 +556,7 @@ export default function BookingPage() {
                             value={guestCount}
                             onChange={(e) => setGuestCount(e.target.value)}
                             required
+                            min="1"
                           />
                         </div>
                       </div>
