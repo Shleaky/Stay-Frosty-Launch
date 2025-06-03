@@ -98,6 +98,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Signup error:", error)
+
+        // Enhanced error handling for duplicate emails
+        if (error.message.includes("User already registered")) {
+          return {
+            data: null,
+            error: {
+              ...error,
+              message: "This email address is already registered. Please log in or use a different email.",
+            },
+          }
+        }
       }
 
       return { data, error }

@@ -10,8 +10,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
+import { AlertCircle, Mail } from "lucide-react"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -26,11 +28,13 @@ export default function SignupPage() {
   const [receiveMarketing, setReceiveMarketing] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailExists, setEmailExists] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
+    setEmailExists(false)
 
     try {
       console.log("Submitting signup form:", { fullName, email, phone, receiveMarketing })
@@ -68,7 +72,19 @@ export default function SignupPage() {
 
       if (signUpError) {
         console.error("SignUp error:", signUpError)
-        setError(signUpError.message)
+
+        // Check if the error is related to email already being used
+        if (
+          signUpError.message.toLowerCase().includes("user already registered") ||
+          signUpError.message.toLowerCase().includes("email already") ||
+          signUpError.message.toLowerCase().includes("already exists")
+        ) {
+          setEmailExists(true)
+          setError("This email address is already registered.")
+        } else {
+          setError(signUpError.message)
+        }
+
         toast({
           title: "Error",
           description: signUpError.message,
@@ -132,10 +148,20 @@ export default function SignupPage() {
                   type="email"
                   placeholder="Enter your email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setEmailExists(false) // Reset email exists state when user types
+                    setError(null)
+                  }}
                   required
-                  className="bg-black/50 border-white/20"
+                  className={`bg-black/50 border-white/20 ${emailExists ? "border-red-500" : ""}`}
                 />
+                {emailExists && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    This email is already registered
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -190,7 +216,30 @@ export default function SignupPage() {
                 </Label>
               </div>
 
-              {error && <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-500">{error}</div>}
+              {emailExists && (
+                <Alert className="border-yellow-500/50 bg-yellow-500/10">
+                  <Mail className="h-4 w-4" />
+                  <AlertDescription className="text-yellow-200">
+                    This email address is already registered. You can either:
+                    <div className="mt-2 space-y-1">
+                      <div>
+                        •{" "}
+                        <Link href="/auth/login" className="text-slushie-blue hover:underline font-medium">
+                          Log in with this email
+                        </Link>
+                      </div>
+                      <div>• Use a different email address to create a new account</div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {error && !emailExists && (
+                <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-500 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  {error}
+                </div>
+              )}
             </CardContent>
 
             <CardFooter className="flex flex-col space-y-4">
