@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import type { Session, User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 import { getBrowserClient } from "@/lib/supabase"
@@ -18,7 +17,6 @@ type AuthContextType = {
   refreshSession: () => Promise<void>
 }
 
-// Update the context creation to provide a default value
 const defaultAuthContext: AuthContextType = {
   user: null,
   session: null,
@@ -37,12 +35,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
   const router = useRouter()
-  const supabase = getBrowserClient()
+
+  // Memoize the supabase client to prevent recreation
+  const supabase = useCallback(() => {
+    try {
+      return getBrowserClient()
+    } catch (err) {
+      console.error("Failed to get Supabase client:", err)
+      setError("Failed to initialize authentication")
+      return null
+    }
+  }, [])
 
   useEffect(() => {
-    const fetchSession = async () => {
+    // Prevent multiple initializations
+    if (isInitialized) return
+
+    const initializeAuth = async () => {
       try {
+        console.log("Initializing auth context...")
+
         // Check if environment variables are available
         if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
           setError("Missing Supabase configuration")
@@ -50,55 +64,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
+        const client = supabase()
+        if (!client) return
 
-        if (error) {
-          console.error("Error fetching session:", error)
-          setError(error.message)
+        // Get initial session
+        const {
+          data: { session: initialSession },
+          error: sessionError,
+        } = await client.auth.getSession()
+
+        if (sessionError) {
+          console.error("Error fetching initial session:", sessionError)
+          setError(sessionError.message)
+        } else {
+          console.log("Initial session:", initialSession?.user?.email || "No session")
+          setSession(initialSession)
+          setUser(initialSession?.user || null)
         }
 
-        setSession(session)
-        setUser(session?.user || null)
+        setIsInitialized(true)
       } catch (err) {
-        console.error("Unexpected error fetching session:", err)
+        console.error("Unexpected error initializing auth:", err)
         setError("Failed to initialize authentication")
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchSession()
+    initializeAuth()
+  }, [isInitialized, supabase])
+
+  useEffect(() => {
+    if (!isInitialized) return
+
+    const client = supabase()
+    if (!client) return
+
+    console.log("Setting up auth state listener...")
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth state changed:", event, session?.user?.email)
+    } = client.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state changed:", event, session?.user?.email || "No user")
+
+      // Prevent rapid state changes
+      if (event === "INITIAL_SESSION") {
+        // Only update if different from current state
+        if (session?.user?.id !== user?.id) {
+          setSession(session)
+          setUser(session?.user || null)
+        }
+        return
+      }
 
       setSession(session)
       setUser(session?.user || null)
-      setIsLoading(false)
 
       // Handle sign out event
       if (event === "SIGNED_OUT") {
-        console.log("User signed out, redirecting to login...")
+        console.log("User signed out, clearing state and redirecting...")
 
-        // Clear any cached data
+        // Clear state immediately
         setUser(null)
         setSession(null)
 
-        // Get current path to determine redirect
+        // Get current path for redirect logic
         const currentPath = window.location.pathname
         const protectedPaths = ["/profile", "/bookings", "/booking"]
 
-        // If user is on a protected page, redirect to login with next parameter
+        // Redirect logic
         if (protectedPaths.some((path) => currentPath.startsWith(path))) {
-          router.push(`/auth/login?next=${encodeURIComponent(currentPath)}`)
+          router.replace(`/auth/login?next=${encodeURIComponent(currentPath)}`)
         } else {
-          // Otherwise just redirect to login
-          router.push("/auth/login")
+          router.replace("/auth/login")
         }
       }
 
@@ -106,26 +144,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === "SIGNED_IN" && session?.user) {
         console.log("User signed in:", session.user.email)
 
-        // Check if there's a redirect URL in the query params
+        // Check for redirect URL
         const urlParams = new URLSearchParams(window.location.search)
         const nextUrl = urlParams.get("next")
 
         if (nextUrl && nextUrl.startsWith("/")) {
-          router.push(nextUrl)
+          router.replace(nextUrl)
         }
       }
     })
 
     return () => {
+      console.log("Cleaning up auth state listener")
       subscription.unsubscribe()
     }
-  }, [router, supabase])
+  }, [isInitialized, router, user?.id, supabase])
 
   const signUp = async (email: string, password: string, metadata: any) => {
     try {
-      console.log("Signing up with:", { email, password, metadata })
+      console.log("Signing up with:", { email, metadata })
 
-      const { data, error } = await supabase.auth.signUp({
+      const client = supabase()
+      if (!client) throw new Error("Supabase client not available")
+
+      const { data, error } = await client.auth.signUp({
         email,
         password,
         options: {
@@ -137,7 +179,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         console.error("Signup error:", error)
 
-        // Enhanced error handling for duplicate emails
         if (error.message.includes("User already registered")) {
           return {
             data: null,
@@ -156,16 +197,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Updated to use email/password login
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      console.log("Signing in with:", email)
+
+      const client = supabase()
+      if (!client) throw new Error("Supabase client not available")
+
+      const { data, error } = await client.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
         console.error("Sign in error:", error)
+      } else {
+        console.log("Sign in successful")
       }
 
       return { data, error }
@@ -179,35 +226,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Initiating sign out...")
 
+      const client = supabase()
+      if (!client) throw new Error("Supabase client not available")
+
       // Clear local state immediately
       setUser(null)
       setSession(null)
 
-      const { error } = await supabase.auth.signOut()
+      const { error } = await client.auth.signOut()
 
       if (error) {
         console.error("Sign out error:", error)
-        // Even if there's an error, we should still redirect
       }
 
-      // Force immediate redirect to login page
+      // Force redirect regardless of error
       const currentPath = window.location.pathname
       const protectedPaths = ["/profile", "/bookings", "/booking"]
 
       if (protectedPaths.some((path) => currentPath.startsWith(path))) {
-        router.push("/auth/login?message=signed_out")
+        router.replace("/auth/login?message=signed_out")
       } else {
-        router.push("/auth/login")
+        router.replace("/auth/login")
       }
 
       return { error }
     } catch (err) {
       console.error("Unexpected sign out error:", err)
 
-      // Even on error, clear state and redirect
+      // Clear state and redirect even on error
       setUser(null)
       setSession(null)
-      router.push("/auth/login?message=error")
+      router.replace("/auth/login?message=error")
 
       return { error: err instanceof Error ? err : new Error(String(err)) }
     }
@@ -215,9 +264,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = async () => {
     try {
+      const client = supabase()
+      if (!client) return
+
       const {
         data: { session },
-      } = await supabase.auth.getSession()
+      } = await client.auth.getSession()
+
       setSession(session)
       setUser(session?.user || null)
     } catch (err) {

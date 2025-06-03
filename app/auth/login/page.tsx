@@ -17,25 +17,28 @@ import { Info } from "lucide-react"
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, signIn } = useAuth()
+  const { user, signIn, isLoading: authLoading } = useAuth()
   const { toast } = useToast()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasRedirected, setHasRedirected] = useState(false)
 
-  // Get message from URL params
+  // Get message and next from URL params
   const message = searchParams.get("message")
   const next = searchParams.get("next")
 
-  // Redirect if already logged in
+  // Redirect if already logged in (but only once)
   useEffect(() => {
-    if (user) {
+    if (user && !hasRedirected && !authLoading) {
+      console.log("User already logged in, redirecting...")
+      setHasRedirected(true)
       const redirectTo = next || "/profile"
-      router.push(redirectTo)
+      router.replace(redirectTo)
     }
-  }, [user, router, next])
+  }, [user, router, next, hasRedirected, authLoading])
 
   // Show message based on URL params
   useEffect(() => {
@@ -55,31 +58,39 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (isLoading || hasRedirected) return
+
     setIsLoading(true)
     setError(null)
 
     try {
+      console.log("Attempting login...")
       const { data, error } = await signIn(email, password)
 
       if (error) {
+        console.error("Login error:", error)
         setError(error.message)
         toast({
-          title: "Error",
+          title: "Login Failed",
           description: error.message,
           variant: "destructive",
         })
-      } else {
-        // Get the redirect URL from the query parameters or default to profile
-        const redirectTo = next || "/profile"
+      } else if (data?.user) {
+        console.log("Login successful, user:", data.user.email)
 
         toast({
           title: "Login Successful!",
           description: "You have been logged in successfully.",
         })
 
-        router.push(redirectTo)
+        // Set redirect flag and redirect
+        setHasRedirected(true)
+        const redirectTo = next || "/profile"
+        router.replace(redirectTo)
       }
     } catch (err) {
+      console.error("Unexpected login error:", err)
       setError("An unexpected error occurred")
       toast({
         title: "Error",
@@ -91,16 +102,21 @@ export default function LoginPage() {
     }
   }
 
-  // Don't render if user is already logged in
-  if (user) {
+  // Show loading while checking authentication or if already redirected
+  if (authLoading || (user && !hasRedirected)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-slushie-blue"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Redirecting...</p>
+          <p className="mt-2 text-sm text-muted-foreground">{user ? "Redirecting..." : "Loading..."}</p>
         </div>
       </div>
     )
+  }
+
+  // Don't render form if user is logged in
+  if (user) {
+    return null
   }
 
   return (
@@ -141,6 +157,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   className="bg-black/50 border-white/20"
+                  disabled={isLoading}
                 />
               </div>
 
@@ -154,6 +171,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   className="bg-black/50 border-white/20"
+                  disabled={isLoading}
                 />
               </div>
 
@@ -164,7 +182,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink text-black font-bold splash-button"
-                disabled={isLoading}
+                disabled={isLoading || hasRedirected}
               >
                 {isLoading ? "Logging in..." : "Log In"}
               </Button>
