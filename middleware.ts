@@ -3,30 +3,40 @@ import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabase"
 
 export async function middleware(request: NextRequest) {
-  // Create a Supabase client configured to use cookies
-  const supabase = createServerClient()
-
   try {
-    // Refresh session if expired - required for Server Components
+    // Create a Supabase client for server-side operations
+    const supabase = createServerClient()
+
+    // Get session from server
     const {
       data: { session },
     } = await supabase.auth.getSession()
 
-    // If user is not signed in and the current path is not /auth/*, redirect to /auth/login
-    if (!session && !request.nextUrl.pathname.startsWith("/auth/")) {
-      if (
-        request.nextUrl.pathname === "/profile" ||
-        request.nextUrl.pathname === "/booking" ||
-        request.nextUrl.pathname === "/bookings"
-      ) {
-        const redirectUrl = new URL("/auth/login", request.url)
-        redirectUrl.searchParams.set("next", request.nextUrl.pathname)
-        return NextResponse.redirect(redirectUrl)
-      }
+    const { pathname } = request.nextUrl
+
+    // Protected routes that require authentication
+    const protectedPaths = ["/profile", "/bookings", "/booking"]
+    const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path))
+
+    // Auth routes that should redirect if already authenticated
+    const authPaths = ["/auth/login", "/auth/signup"]
+    const isAuthPath = authPaths.some((path) => pathname.startsWith(path))
+
+    console.log(
+      `Middleware: ${pathname}, Session: ${session?.user?.email || "None"}, Protected: ${isProtectedPath}, Auth: ${isAuthPath}`,
+    )
+
+    // If user is not signed in and trying to access protected route
+    if (!session && isProtectedPath) {
+      console.log(`Redirecting unauthenticated user from ${pathname} to login`)
+      const redirectUrl = new URL("/auth/login", request.url)
+      redirectUrl.searchParams.set("next", pathname)
+      return NextResponse.redirect(redirectUrl)
     }
 
-    // If user is signed in and the current path is /auth/*, redirect to /profile
-    if (session && request.nextUrl.pathname.startsWith("/auth/")) {
+    // If user is signed in and trying to access auth pages, redirect to profile
+    if (session && isAuthPath) {
+      console.log(`Redirecting authenticated user from ${pathname} to profile`)
       return NextResponse.redirect(new URL("/profile", request.url))
     }
 
@@ -35,6 +45,13 @@ export async function middleware(request: NextRequest) {
     response.headers.set("X-Content-Type-Options", "nosniff")
     response.headers.set("X-Frame-Options", "DENY")
     response.headers.set("X-XSS-Protection", "1; mode=block")
+
+    // Add cache control for auth-related pages
+    if (isProtectedPath || isAuthPath) {
+      response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate")
+      response.headers.set("Pragma", "no-cache")
+      response.headers.set("Expires", "0")
+    }
 
     return response
   } catch (error) {
@@ -48,14 +65,22 @@ export async function middleware(request: NextRequest) {
       )
     }
 
-    // For non-API routes, redirect to error page with the error message
-    const errorUrl = new URL("/error", request.url)
-    errorUrl.searchParams.set("message", "An unexpected error occurred")
-    return NextResponse.redirect(errorUrl)
+    // For non-API routes, allow the request to continue
+    // Don't redirect to avoid infinite loops
+    return NextResponse.next()
   }
 }
 
 // Specify the paths this middleware should run on
 export const config = {
-  matcher: ["/profile/:path*", "/booking/:path*", "/bookings/:path*", "/auth/:path*", "/api/:path*"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    "/((?!_next/static|_next/image|favicon.ico|public/).*)",
+  ],
 }

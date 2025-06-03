@@ -2,9 +2,11 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Menu, X, User } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +18,42 @@ import {
 export default function ClientNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { user, signOut } = useAuth()
+  const { toast } = useToast()
+  const router = useRouter()
+
+  const handleSignOut = async () => {
+    try {
+      console.log("Sign out initiated from navbar")
+
+      // Close mobile menu if open
+      setIsMenuOpen(false)
+
+      // Show immediate feedback
+      toast({
+        title: "Signing out...",
+        description: "You are being signed out.",
+      })
+
+      // Call sign out function
+      await signOut()
+
+      // Additional toast for successful sign out
+      toast({
+        title: "Signed out successfully",
+        description: "You have been signed out of your account.",
+      })
+    } catch (error) {
+      console.error("Error during sign out:", error)
+      toast({
+        title: "Sign out error",
+        description: "There was an issue signing you out. Please try again.",
+        variant: "destructive",
+      })
+
+      // Force redirect even on error
+      router.push("/auth/login")
+    }
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-black/80 backdrop-blur-sm">
@@ -35,6 +73,9 @@ export default function ClientNavbar() {
           <Link href="/booking" className="text-lg font-medium hover:text-slushie-pink transition-colors">
             Book Now
           </Link>
+          <Link href="/contact" className="text-lg font-medium hover:text-slushie-green transition-colors">
+            Contact
+          </Link>
         </nav>
         <div className="flex items-center gap-4">
           {user ? (
@@ -52,10 +93,12 @@ export default function ClientNavbar() {
                     <Link href="/profile">Profile</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/booking">My Bookings</Link>
+                    <Link href="/bookings">My Bookings</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => signOut()}>Sign Out</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut} className="text-red-400 focus:text-red-400">
+                    Sign Out
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -97,6 +140,13 @@ export default function ClientNavbar() {
           >
             Book Now
           </Link>
+          <Link
+            href="/contact"
+            className="text-lg font-medium hover:text-slushie-green transition-colors"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Contact
+          </Link>
           {user ? (
             <>
               <Link
@@ -106,13 +156,17 @@ export default function ClientNavbar() {
               >
                 Profile
               </Link>
+              <Link
+                href="/bookings"
+                className="text-lg font-medium hover:text-slushie-blue transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                My Bookings
+              </Link>
               <Button
                 variant="ghost"
-                className="justify-start px-0 text-lg font-medium hover:text-slushie-pink transition-colors"
-                onClick={() => {
-                  signOut()
-                  setIsMenuOpen(false)
-                }}
+                className="justify-start px-0 text-lg font-medium hover:text-red-400 transition-colors text-red-400"
+                onClick={handleSignOut}
               >
                 Sign Out
               </Button>
