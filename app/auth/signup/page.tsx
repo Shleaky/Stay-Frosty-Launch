@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
+import { checkEmailExists } from "@/app/actions/auth-actions"
 import { AlertCircle, Mail } from "lucide-react"
 
 export default function SignupPage() {
@@ -29,12 +30,38 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [emailExists, setEmailExists] = useState(false)
+  const [checkingEmail, setCheckingEmail] = useState(false)
+
+  const handleEmailBlur = async () => {
+    if (!email.trim()) return
+
+    setCheckingEmail(true)
+    setEmailExists(false)
+    setError(null)
+
+    try {
+      const { exists, error: checkError } = await checkEmailExists(email)
+
+      if (checkError) {
+        console.error("Error checking email:", checkError)
+        return
+      }
+
+      if (exists) {
+        setEmailExists(true)
+        setError("This email address is already registered.")
+      }
+    } catch (err) {
+      console.error("Unexpected error checking email:", err)
+    } finally {
+      setCheckingEmail(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
-    setEmailExists(false)
 
     try {
       console.log("Submitting signup form:", { fullName, email, phone, receiveMarketing })
@@ -60,6 +87,24 @@ export default function SignupPage() {
         throw new Error("Passwords do not match")
       }
 
+      // Check email exists before attempting signup
+      const { exists, error: checkError } = await checkEmailExists(email)
+
+      if (checkError) {
+        throw new Error("Failed to verify email. Please try again.")
+      }
+
+      if (exists) {
+        setEmailExists(true)
+        setError("This email address is already registered.")
+        toast({
+          title: "Email Already Registered",
+          description: "Please log in with this email or use a different email address.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const userData = {
         full_name: fullName,
         phone,
@@ -72,19 +117,7 @@ export default function SignupPage() {
 
       if (signUpError) {
         console.error("SignUp error:", signUpError)
-
-        // Check if the error is related to email already being used
-        if (
-          signUpError.message.toLowerCase().includes("user already registered") ||
-          signUpError.message.toLowerCase().includes("email already") ||
-          signUpError.message.toLowerCase().includes("already exists")
-        ) {
-          setEmailExists(true)
-          setError("This email address is already registered.")
-        } else {
-          setError(signUpError.message)
-        }
-
+        setError(signUpError.message)
         toast({
           title: "Error",
           description: signUpError.message,
@@ -153,9 +186,11 @@ export default function SignupPage() {
                     setEmailExists(false) // Reset email exists state when user types
                     setError(null)
                   }}
+                  onBlur={handleEmailBlur}
                   required
                   className={`bg-black/50 border-white/20 ${emailExists ? "border-red-500" : ""}`}
                 />
+                {checkingEmail && <p className="text-sm text-gray-400">Checking email availability...</p>}
                 {emailExists && (
                   <p className="text-sm text-red-500 flex items-center gap-1">
                     <AlertCircle className="h-4 w-4" />
@@ -246,7 +281,7 @@ export default function SignupPage() {
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink text-black font-bold splash-button"
-                disabled={isLoading}
+                disabled={isLoading || emailExists || checkingEmail}
               >
                 {isLoading ? "Creating Account..." : "Sign Up"}
               </Button>
