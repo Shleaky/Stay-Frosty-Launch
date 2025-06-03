@@ -10,8 +10,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
+import { checkEmailExists } from "@/app/actions/auth-actions"
+import { AlertCircle, Mail } from "lucide-react"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -26,6 +29,34 @@ export default function SignupPage() {
   const [receiveMarketing, setReceiveMarketing] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailExists, setEmailExists] = useState(false)
+  const [checkingEmail, setCheckingEmail] = useState(false)
+
+  const handleEmailBlur = async () => {
+    if (!email.trim()) return
+
+    setCheckingEmail(true)
+    setEmailExists(false)
+    setError(null)
+
+    try {
+      const { exists, error: checkError } = await checkEmailExists(email)
+
+      if (checkError) {
+        console.error("Error checking email:", checkError)
+        return
+      }
+
+      if (exists) {
+        setEmailExists(true)
+        setError("This email address is already registered.")
+      }
+    } catch (err) {
+      console.error("Unexpected error checking email:", err)
+    } finally {
+      setCheckingEmail(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,6 +85,24 @@ export default function SignupPage() {
 
       if (password !== confirmPassword) {
         throw new Error("Passwords do not match")
+      }
+
+      // Check email exists before attempting signup
+      const { exists, error: checkError } = await checkEmailExists(email)
+
+      if (checkError) {
+        throw new Error("Failed to verify email. Please try again.")
+      }
+
+      if (exists) {
+        setEmailExists(true)
+        setError("This email address is already registered.")
+        toast({
+          title: "Email Already Registered",
+          description: "Please log in with this email or use a different email address.",
+          variant: "destructive",
+        })
+        return
       }
 
       const userData = {
@@ -108,7 +157,7 @@ export default function SignupPage() {
               </span>
             </CardTitle>
             <CardDescription className="text-center">
-              Sign up to book caliper painting services and manage your bookings
+              Sign up to book slushie machine rentals and manage your bookings
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
@@ -132,10 +181,22 @@ export default function SignupPage() {
                   type="email"
                   placeholder="Enter your email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setEmailExists(false) // Reset email exists state when user types
+                    setError(null)
+                  }}
+                  onBlur={handleEmailBlur}
                   required
-                  className="bg-black/50 border-white/20"
+                  className={`bg-black/50 border-white/20 ${emailExists ? "border-red-500" : ""}`}
                 />
+                {checkingEmail && <p className="text-sm text-gray-400">Checking email availability...</p>}
+                {emailExists && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    This email is already registered
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -190,14 +251,37 @@ export default function SignupPage() {
                 </Label>
               </div>
 
-              {error && <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-500">{error}</div>}
+              {emailExists && (
+                <Alert className="border-yellow-500/50 bg-yellow-500/10">
+                  <Mail className="h-4 w-4" />
+                  <AlertDescription className="text-yellow-200">
+                    This email address is already registered. You can either:
+                    <div className="mt-2 space-y-1">
+                      <div>
+                        •{" "}
+                        <Link href="/auth/login" className="text-slushie-blue hover:underline font-medium">
+                          Log in with this email
+                        </Link>
+                      </div>
+                      <div>• Use a different email address to create a new account</div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {error && !emailExists && (
+                <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-500 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  {error}
+                </div>
+              )}
             </CardContent>
 
             <CardFooter className="flex flex-col space-y-4">
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink text-black font-bold splash-button"
-                disabled={isLoading}
+                disabled={isLoading || emailExists || checkingEmail}
               >
                 {isLoading ? "Creating Account..." : "Sign Up"}
               </Button>

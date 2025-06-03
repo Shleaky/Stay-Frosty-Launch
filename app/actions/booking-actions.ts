@@ -2,6 +2,7 @@
 
 import { createServerClient } from "@/lib/supabase"
 import { revalidatePath } from "next/cache"
+import { bookingFormSchema, validate } from "@/lib/validators"
 
 export type SlushieBookingFormData = {
   userId: string | null
@@ -21,6 +22,12 @@ export type SlushieBookingFormData = {
 
 export async function createSlushieBooking(formData: SlushieBookingFormData) {
   try {
+    // Validate form data
+    const validation = await validate(bookingFormSchema, formData)
+    if (!validation.success) {
+      return { success: false, error: "Validation failed", validationErrors: validation.errors }
+    }
+
     const supabase = createServerClient()
 
     const bookingData = {
@@ -59,6 +66,10 @@ export async function createSlushieBooking(formData: SlushieBookingFormData) {
 
 export async function getUserSlushieBookings(userId: string) {
   try {
+    if (!userId) {
+      return { success: false, error: "User ID is required" }
+    }
+
     const supabase = createServerClient()
 
     const { data, error } = await supabase
@@ -81,6 +92,10 @@ export async function getUserSlushieBookings(userId: string) {
 
 export async function cancelSlushieBooking(bookingId: string, userId: string) {
   try {
+    if (!bookingId || !userId) {
+      return { success: false, error: "Booking ID and User ID are required" }
+    }
+
     const supabase = createServerClient()
 
     // First verify that this booking belongs to the user
