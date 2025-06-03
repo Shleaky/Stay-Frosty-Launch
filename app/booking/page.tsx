@@ -36,7 +36,6 @@ export default function BookingPage() {
   const router = useRouter()
   const { user, isLoading: authLoading } = useAuth()
   const { toast } = useToast()
-  const supabase = getBrowserClient()
 
   // Form state
   const [selectedMachine, setSelectedMachine] = useState<string>("")
@@ -145,6 +144,8 @@ export default function BookingPage() {
 
     const fetchUserProfile = async () => {
       try {
+        const supabase = getBrowserClient()
+
         const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
         if (error) {
@@ -163,7 +164,7 @@ export default function BookingPage() {
     }
 
     fetchUserProfile()
-  }, [user, authLoading, supabase])
+  }, [user, authLoading])
 
   // Calculate total price
   const calculateTotal = () => {

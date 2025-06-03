@@ -67,7 +67,6 @@ export default function ProfilePage() {
   const router = useRouter()
   const { user, isLoading: authLoading, signOut } = useAuth()
   const { toast } = useToast()
-  const supabase = getBrowserClient()
 
   const [profileData, setProfileData] = useState<ProfileData>({
     full_name: "",
@@ -96,6 +95,9 @@ export default function ProfilePage() {
 
     const fetchData = async () => {
       try {
+        // Create supabase client only on client side
+        const supabase = getBrowserClient()
+
         // Fetch profile data
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
@@ -153,7 +155,7 @@ export default function ProfilePage() {
     }
 
     fetchData()
-  }, [user, authLoading, supabase, toast])
+  }, [user, authLoading, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -161,6 +163,8 @@ export default function ProfilePage() {
     setError(null)
 
     try {
+      const supabase = getBrowserClient()
+
       const { error } = await supabase
         .from("profiles")
         .update({
