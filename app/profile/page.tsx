@@ -80,13 +80,19 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Redirect if not authenticated
   useEffect(() => {
     if (authLoading) return
 
     if (!user) {
+      console.log("No user found, redirecting to login...")
       router.push("/auth/login?next=/profile")
       return
     }
+  }, [user, authLoading, router])
+
+  useEffect(() => {
+    if (authLoading || !user) return
 
     const fetchData = async () => {
       try {
@@ -147,7 +153,7 @@ export default function ProfilePage() {
     }
 
     fetchData()
-  }, [user, authLoading, router, supabase, toast])
+  }, [user, authLoading, supabase, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -186,8 +192,43 @@ export default function ProfilePage() {
   }
 
   const handleSignOut = async () => {
-    await signOut()
-    router.push("/")
+    try {
+      console.log("Sign out initiated from profile page")
+
+      toast({
+        title: "Signing out...",
+        description: "You are being signed out.",
+      })
+
+      await signOut()
+
+      toast({
+        title: "Signed out successfully",
+        description: "You have been signed out of your account.",
+      })
+    } catch (error) {
+      console.error("Error during sign out:", error)
+      toast({
+        title: "Sign out error",
+        description: "There was an issue signing you out.",
+        variant: "destructive",
+      })
+
+      // Force redirect even on error
+      router.push("/auth/login")
+    }
+  }
+
+  // Show loading while checking authentication
+  if (authLoading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-slushie-blue"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -195,7 +236,7 @@ export default function ProfilePage() {
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-slushie-blue"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading profile...</p>
+          <p className="mt-2 text-sm text-muted-foreground">Loading profile data...</p>
         </div>
       </div>
     )
@@ -282,7 +323,12 @@ export default function ProfilePage() {
               </CardContent>
 
               <CardFooter className="flex flex-col space-y-4 sm:flex-row sm:justify-between sm:space-y-0">
-                <Button type="button" variant="outline" onClick={handleSignOut} className="w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSignOut}
+                  className="w-full sm:w-auto text-red-400 border-red-400 hover:bg-red-400 hover:text-black"
+                >
                   Sign Out
                 </Button>
 

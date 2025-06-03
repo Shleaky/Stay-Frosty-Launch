@@ -4,6 +4,7 @@ import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
 import type { Session, User } from "@supabase/supabase-js"
+import { useRouter } from "next/navigation"
 import { getBrowserClient } from "@/lib/supabase"
 
 type AuthContextType = {
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
   const supabase = getBrowserClient()
 
   useEffect(() => {
@@ -72,16 +74,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state changed:", event, session?.user?.email)
+
       setSession(session)
       setUser(session?.user || null)
       setIsLoading(false)
+
+      // Handle sign out event
+      if (event === "SIGNED_OUT") {
+        console.log("User signed out, redirecting to login...")
+
+        // Clear any cached data
+        setUser(null)
+        setSession(null)
+
+        // Get current path to determine redirect
+        const currentPath = window.location.pathname
+        const protectedPaths = ["/profile", "/bookings", "/booking"]
+
+        // If user is on a protected page, redirect to login with next parameter
+        if (protectedPaths.some((path) => currentPath.startsWith(path))) {
+          router.push(`/auth/login?next=${encodeURIComponent(currentPath)}`)
+        } else {
+          // Otherwise just redirect to login
+          router.push("/auth/login")
+        }
+      }
+
+      // Handle sign in event
+      if (event === "SIGNED_IN" && session?.user) {
+        console.log("User signed in:", session.user.email)
+
+        // Check if there's a redirect URL in the query params
+        const urlParams = new URLSearchParams(window.location.search)
+        const nextUrl = urlParams.get("next")
+
+        if (nextUrl && nextUrl.startsWith("/")) {
+          router.push(nextUrl)
+        }
+      }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [router, supabase])
 
   const signUp = async (email: string, password: string, metadata: any) => {
     try {
@@ -139,15 +177,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      console.log("Initiating sign out...")
+
+      // Clear local state immediately
+      setUser(null)
+      setSession(null)
+
       const { error } = await supabase.auth.signOut()
 
       if (error) {
         console.error("Sign out error:", error)
+        // Even if there's an error, we should still redirect
+      }
+
+      // Force immediate redirect to login page
+      const currentPath = window.location.pathname
+      const protectedPaths = ["/profile", "/bookings", "/booking"]
+
+      if (protectedPaths.some((path) => currentPath.startsWith(path))) {
+        router.push("/auth/login?message=signed_out")
+      } else {
+        router.push("/auth/login")
       }
 
       return { error }
     } catch (err) {
       console.error("Unexpected sign out error:", err)
+
+      // Even on error, clear state and redirect
+      setUser(null)
+      setSession(null)
+      router.push("/auth/login?message=error")
+
       return { error: err instanceof Error ? err : new Error(String(err)) }
     }
   }

@@ -12,21 +12,21 @@ export async function middleware(request: NextRequest) {
       data: { session },
     } = await supabase.auth.getSession()
 
-    // If user is not signed in and the current path is not /auth/*, redirect to /auth/login
-    if (!session && !request.nextUrl.pathname.startsWith("/auth/")) {
-      if (
-        request.nextUrl.pathname === "/profile" ||
-        request.nextUrl.pathname === "/booking" ||
-        request.nextUrl.pathname === "/bookings"
-      ) {
-        const redirectUrl = new URL("/auth/login", request.url)
-        redirectUrl.searchParams.set("next", request.nextUrl.pathname)
-        return NextResponse.redirect(redirectUrl)
-      }
+    // Protected routes that require authentication
+    const protectedPaths = ["/profile", "/bookings", "/booking"]
+    const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path))
+
+    // If user is not signed in and trying to access protected route
+    if (!session && isProtectedPath) {
+      console.log(`Redirecting unauthenticated user from ${request.nextUrl.pathname} to login`)
+      const redirectUrl = new URL("/auth/login", request.url)
+      redirectUrl.searchParams.set("next", request.nextUrl.pathname)
+      return NextResponse.redirect(redirectUrl)
     }
 
-    // If user is signed in and the current path is /auth/*, redirect to /profile
+    // If user is signed in and trying to access auth pages, redirect to profile
     if (session && request.nextUrl.pathname.startsWith("/auth/")) {
+      console.log(`Redirecting authenticated user from ${request.nextUrl.pathname} to profile`)
       return NextResponse.redirect(new URL("/profile", request.url))
     }
 
@@ -35,6 +35,13 @@ export async function middleware(request: NextRequest) {
     response.headers.set("X-Content-Type-Options", "nosniff")
     response.headers.set("X-Frame-Options", "DENY")
     response.headers.set("X-XSS-Protection", "1; mode=block")
+
+    // Add cache control for auth-related pages
+    if (isProtectedPath) {
+      response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate")
+      response.headers.set("Pragma", "no-cache")
+      response.headers.set("Expires", "0")
+    }
 
     return response
   } catch (error) {
@@ -48,10 +55,10 @@ export async function middleware(request: NextRequest) {
       )
     }
 
-    // For non-API routes, redirect to error page with the error message
-    const errorUrl = new URL("/error", request.url)
-    errorUrl.searchParams.set("message", "An unexpected error occurred")
-    return NextResponse.redirect(errorUrl)
+    // For non-API routes, redirect to login with error message
+    const loginUrl = new URL("/auth/login", request.url)
+    loginUrl.searchParams.set("message", "error")
+    return NextResponse.redirect(loginUrl)
   }
 }
 
