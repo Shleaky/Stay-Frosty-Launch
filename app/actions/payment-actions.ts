@@ -3,6 +3,7 @@
 import Stripe from "stripe"
 import { createServerClient } from "@/lib/supabase"
 import { revalidatePath } from "next/cache"
+import { paymentSchema, validate } from "@/lib/validators"
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -11,6 +12,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function createPaymentIntent(bookingId: string, amount: number) {
   try {
+    // Validate input
+    const validation = await validate(paymentSchema, { bookingId, amount })
+    if (!validation.success) {
+      return { success: false, error: "Validation failed", validationErrors: validation.errors }
+    }
+
     // Fetch the booking to verify it exists and get details
     const supabase = createServerClient()
     const { data: booking, error: bookingError } = await supabase
@@ -57,6 +64,13 @@ export async function createPaymentIntent(bookingId: string, amount: number) {
 
 export async function updateBookingPaymentStatus(bookingId: string, paymentIntentId: string, status: string) {
   try {
+    if (!bookingId || !paymentIntentId || !status) {
+      return {
+        success: false,
+        error: "Missing required parameters: bookingId, paymentIntentId, and status are required",
+      }
+    }
+
     const supabase = createServerClient()
 
     const { error } = await supabase

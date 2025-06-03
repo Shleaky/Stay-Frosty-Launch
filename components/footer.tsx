@@ -26,10 +26,10 @@ export default function Footer() {
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-slushie-blue">Contact</h3>
             <a href="tel:+1234567890" className="text-sm text-muted-foreground hover:text-white">
-              (+61) 04 3891 4018
+              (123) 456-7890
             </a>
-            <a href="mailto:stayfrostyco@gmail.com" className="text-sm text-muted-foreground hover:text-white">
-              stayfrostyco@gmail.com
+            <a href="mailto:info@stayfrosty.com" className="text-sm text-muted-foreground hover:text-white">
+              info@stayfrosty.com
             </a>
           </div>
           <div className="flex flex-col gap-2">
@@ -39,6 +39,9 @@ export default function Footer() {
             </a>
             <a href="#" className="text-sm text-muted-foreground hover:text-white">
               Facebook
+            </a>
+            <a href="#" className="text-sm text-muted-foreground hover:text-white">
+              Twitter
             </a>
           </div>
         </div>

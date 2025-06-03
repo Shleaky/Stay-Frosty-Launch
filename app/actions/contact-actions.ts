@@ -1,6 +1,7 @@
 "use server"
 
 import { Resend } from "resend"
+import { contactFormSchema, validate } from "@/lib/validators"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -15,6 +16,12 @@ type ContactFormData = {
 
 export async function sendContactEmail(formData: ContactFormData) {
   try {
+    // Validate form data
+    const validation = await validate(contactFormSchema, formData)
+    if (!validation.success) {
+      return { success: false, error: "Validation failed", validationErrors: validation.errors }
+    }
+
     // Map service values to readable names
     const serviceNames: Record<string, string> = {
       "single-machine": "Single Machine Rental",

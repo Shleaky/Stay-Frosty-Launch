@@ -108,7 +108,7 @@ export default function SignupPage() {
               </span>
             </CardTitle>
             <CardDescription className="text-center">
-              Sign up to book caliper painting services and manage your bookings
+              Sign up to book slushie machine rentals and manage your bookings
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
