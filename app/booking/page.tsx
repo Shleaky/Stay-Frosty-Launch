@@ -82,6 +82,7 @@ export default function BookingPage() {
       description: "Perfect for small gatherings (up to 50 guests)",
       price: 150,
       flavors: 1,
+      image: "/images/single-slushie-machine.png",
     },
     {
       id: "double",
@@ -89,6 +90,7 @@ export default function BookingPage() {
       description: "Great for medium events (up to 100 guests)",
       price: 250,
       flavors: 2,
+      image: "/images/double-slushie-machine.png",
     },
     {
       id: "triple",
@@ -96,6 +98,7 @@ export default function BookingPage() {
       description: "Perfect for large events (up to 200 guests)",
       price: 350,
       flavors: 3,
+      image: "/images/triple-slushie-machine.png",
     },
   ]
 
@@ -421,15 +424,27 @@ export default function BookingPage() {
                                 htmlFor={`machine-${machine.id}`}
                                 className="flex flex-col justify-between rounded-md border-2 border-muted bg-black p-4 hover:bg-slate-900 hover:border-slushie-blue peer-data-[state=checked]:border-slushie-green [&:has([data-state=checked])]:border-slushie-green cursor-pointer"
                               >
-                                <div className="flex justify-between items-start">
-                                  <div>
+                                <div className="flex justify-between items-start gap-4">
+                                  <div className="flex-1">
                                     <div className="text-lg font-semibold">{machine.name}</div>
                                     <div className="text-sm text-muted-foreground mt-1">{machine.description}</div>
                                     <div className="text-sm text-slushie-blue mt-1">
                                       {machine.flavors} flavor{machine.flavors > 1 ? "s" : ""}
                                     </div>
                                   </div>
-                                  <div className="text-slushie-green font-bold text-lg">${machine.price}</div>
+                                  <div className="flex flex-col items-end gap-2">
+                                    <div className="text-slushie-green font-bold text-lg">${machine.price}</div>
+                                    {machine.image && (
+                                      <img
+                                        src={machine.image || "/placeholder.svg"}
+                                        alt={machine.name}
+                                        className="w-16 h-16 object-cover rounded"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = "none"
+                                        }}
+                                      />
+                                    )}
+                                  </div>
                                 </div>
                               </Label>
                             </div>

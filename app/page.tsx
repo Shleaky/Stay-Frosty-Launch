@@ -103,8 +103,8 @@ export default function Home() {
               <div className="relative h-48 overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 z-10"></div>
                 <Image
-                  src="/images/party-package.png"
-                  alt="Party Package"
+                  src="/images/party-package.webp"
+                  alt="Party Package - Close-up of hands dispensing red slushie from FREEZ'ME machine"
                   width={500}
                   height={300}
                   className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500"
@@ -146,8 +146,8 @@ export default function Home() {
               <div className="relative h-48 overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 z-10"></div>
                 <Image
-                  src="/images/event-package.png"
-                  alt="Event Package"
+                  src="/images/event-package.webp"
+                  alt="Event Package - Elegant slushie cart with white balloon arch and professional setup"
                   width={500}
                   height={300}
                   className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500"
@@ -189,8 +189,8 @@ export default function Home() {
               <div className="relative h-48 overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 z-10"></div>
                 <Image
-                  src="/images/festival-package.png"
-                  alt="Festival Package"
+                  src="/images/festival-package.webp"
+                  alt="Festival Package - Vibrant cartoon illustration with colorful slushie cups and burst background"
                   width={500}
                   height={300}
                   className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500"
