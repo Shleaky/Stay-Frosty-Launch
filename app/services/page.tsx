@@ -386,9 +386,7 @@ export default function ServicesPage() {
 
             <Card className="bg-black/50 border border-white/10 overflow-hidden">
               <CardContent className="p-6">
-                <h3 className="text-2xl font-bold text-gradient-to-r from-slushie-green to-slushie-blue bg-clip-text text-transparent mb-4">
-                  Long-Term Rentals
-                </h3>
+                <h3 className="text-2xl font-bold text-slushie-blue mb-4">Long-Term Rentals</h3>
                 <p className="text-white/80 mb-4">
                   Need slushie machines for an extended period? We offer special rates for weekly and monthly rentals.
                 </p>

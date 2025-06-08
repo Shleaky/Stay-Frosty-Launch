@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState, useCallback } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import type { Session, User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 import { getBrowserClient } from "@/lib/supabase"
@@ -36,22 +36,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [supabaseClient, setSupabaseClient] = useState<any>(null)
   const router = useRouter()
 
-  // Memoize the supabase client to prevent recreation
-  const supabase = useCallback(() => {
-    try {
-      return getBrowserClient()
-    } catch (err) {
-      console.error("Failed to get Supabase client:", err)
-      setError("Failed to initialize authentication")
-      return null
+  // Initialize client only once
+  useEffect(() => {
+    if (typeof window !== "undefined" && !supabaseClient) {
+      try {
+        const client = getBrowserClient()
+        setSupabaseClient(client)
+      } catch (err) {
+        console.error("Failed to get Supabase client:", err)
+        setError("Failed to initialize authentication")
+      }
     }
-  }, [])
+  }, [supabaseClient])
 
   useEffect(() => {
     // Prevent multiple initializations
-    if (isInitialized) return
+    if (isInitialized || !supabaseClient) return
 
     const initializeAuth = async () => {
       try {
@@ -64,14 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        const client = supabase()
-        if (!client) return
-
         // Get initial session
         const {
           data: { session: initialSession },
           error: sessionError,
-        } = await client.auth.getSession()
+        } = await supabaseClient.auth.getSession()
 
         if (sessionError) {
           console.error("Error fetching initial session:", sessionError)
@@ -92,19 +92,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     initializeAuth()
-  }, [isInitialized, supabase])
+  }, [isInitialized, supabaseClient])
 
   useEffect(() => {
-    if (!isInitialized) return
-
-    const client = supabase()
-    if (!client) return
+    if (!isInitialized || !supabaseClient) return
 
     console.log("Setting up auth state listener...")
 
     const {
       data: { subscription },
-    } = client.auth.onAuthStateChange((event, session) => {
+    } = supabaseClient.auth.onAuthStateChange((event, session) => {
       console.log("Auth state changed:", event, session?.user?.email || "No user")
 
       // Prevent rapid state changes
@@ -158,16 +155,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Cleaning up auth state listener")
       subscription.unsubscribe()
     }
-  }, [isInitialized, router, user?.id, supabase])
+  }, [isInitialized, router, user?.id, supabaseClient])
 
   const signUp = async (email: string, password: string, metadata: any) => {
     try {
       console.log("Signing up with:", { email, metadata })
 
-      const client = supabase()
-      if (!client) throw new Error("Supabase client not available")
+      if (!supabaseClient) throw new Error("Supabase client not available")
 
-      const { data, error } = await client.auth.signUp({
+      const { data, error } = await supabaseClient.auth.signUp({
         email,
         password,
         options: {
@@ -201,10 +197,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Signing in with:", email)
 
-      const client = supabase()
-      if (!client) throw new Error("Supabase client not available")
+      if (!supabaseClient) throw new Error("Supabase client not available")
 
-      const { data, error } = await client.auth.signInWithPassword({
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
         email,
         password,
       })
@@ -226,14 +221,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Initiating sign out...")
 
-      const client = supabase()
-      if (!client) throw new Error("Supabase client not available")
+      if (!supabaseClient) throw new Error("Supabase client not available")
 
       // Clear local state immediately
       setUser(null)
       setSession(null)
 
-      const { error } = await client.auth.signOut()
+      const { error } = await supabaseClient.auth.signOut()
 
       if (error) {
         console.error("Sign out error:", error)
@@ -264,12 +258,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = async () => {
     try {
-      const client = supabase()
-      if (!client) return
+      if (!supabaseClient) return
 
       const {
         data: { session },
-      } = await client.auth.getSession()
+      } = await supabaseClient.auth.getSession()
 
       setSession(session)
       setUser(session?.user || null)
