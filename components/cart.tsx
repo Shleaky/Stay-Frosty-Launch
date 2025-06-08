@@ -26,7 +26,10 @@ export function Cart() {
   const [orderId, setOrderId] = useState<string | null>(null)
 
   const handleCheckout = async () => {
+    console.log("Starting checkout process...")
+
     if (!user) {
+      console.log("No user found, redirecting to login")
       router.push("/auth/login?next=/products")
       setIsOpen(false)
       return
@@ -41,10 +44,17 @@ export function Cart() {
       return
     }
 
+    console.log("Checkout data:", {
+      user: user.id,
+      items: items.length,
+      subtotal,
+      itemsDetail: items,
+    })
+
     setIsCheckingOut(true)
 
     try {
-      const result = await createProductOrder({
+      const orderData = {
         items: items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -53,19 +63,40 @@ export function Cart() {
         })),
         userId: user.id,
         totalAmount: subtotal,
-      })
+      }
+
+      console.log("Calling createProductOrder with:", orderData)
+
+      const result = await createProductOrder(orderData)
+
+      console.log("createProductOrder result:", result)
 
       if (!result.success) {
+        console.error("Order creation failed:", result)
         throw new Error(result.error || "Failed to create order")
       }
 
-      setClientSecret(result.clientSecret!)
+      if (!result.clientSecret) {
+        console.error("No client secret returned")
+        throw new Error("Payment setup failed - no client secret")
+      }
+
+      console.log("Order created successfully:", result.orderId)
+
+      setClientSecret(result.clientSecret)
       setOrderId(result.orderId!)
+
+      toast({
+        title: "Order Created",
+        description: "Please complete your payment to confirm your order.",
+      })
     } catch (error) {
-      console.error("Error creating order:", error)
+      console.error("Error during checkout:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to process checkout"
+
       toast({
         title: "Checkout Failed",
-        description: error instanceof Error ? error.message : "Failed to process checkout",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -74,6 +105,7 @@ export function Cart() {
   }
 
   const handlePaymentSuccess = () => {
+    console.log("Payment successful, clearing cart and redirecting")
     clearCart()
     setIsOpen(false)
     setClientSecret(null)
@@ -101,6 +133,19 @@ export function Cart() {
         {clientSecret && orderId ? (
           <div className="mt-6 space-y-6">
             <h3 className="font-semibold text-lg">Complete Your Payment</h3>
+            <div className="bg-black/30 p-4 rounded-lg">
+              <h4 className="font-medium mb-2">Order Summary</h4>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Items ({totalItems})</span>
+                  <span>${subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Shipping</span>
+                  <span>Calculated at checkout</span>
+                </div>
+              </div>
+            </div>
             <StripeProvider clientSecret={clientSecret}>
               <PaymentForm bookingId={orderId} clientSecret={clientSecret} />
             </StripeProvider>
