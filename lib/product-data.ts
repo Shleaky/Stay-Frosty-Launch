@@ -22,7 +22,7 @@ export const products: Product[] = [
     description:
       "Ready-to-eat fairy floss in a variety of delicious flavors. Perfect for parties, events, or a sweet treat anytime!",
     price: 7.99,
-    image: "/images/products/fairy-floss-bags.jpeg",
+    image: "/images/products/fairy-floss-bags.webp",
     category: "fairy-floss",
     hasFlavors: true,
     flavors: flavors,
@@ -34,7 +34,7 @@ export const products: Product[] = [
     description:
       "Premium fairy floss sugar for use with any standard fairy floss machine. Make your own fluffy treats at home!",
     price: 19.99,
-    image: "/images/products/fairy-floss-sugar.jpeg",
+    image: "/images/products/fairy-floss-sugar.webp",
     category: "fairy-floss",
     hasFlavors: true,
     flavors: flavors,
@@ -57,7 +57,7 @@ export const products: Product[] = [
     description:
       "Artisan pistachio spread made with premium nuts. A delicious and unique alternative to traditional nut butters.",
     price: 24.99,
-    image: "/images/products/pistachio-papi.jpeg",
+    image: "/images/products/pistachio-papi.webp",
     category: "spreads",
     hasFlavors: false,
     inStock: true,
