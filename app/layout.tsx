@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import { AuthProvider } from "@/contexts/auth-context"
+import { CartProvider } from "@/contexts/cart-context"
 import { Toaster } from "@/components/ui/toaster"
 import { AuthErrorBoundary } from "@/components/auth-error-boundary"
 
@@ -14,10 +15,9 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Stay Frosty Slushies",
   description: "Premium slushie machines for hire - perfect for parties and events!",
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
-// Make sure the AuthProvider is properly wrapping the application
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,13 +28,15 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            <AuthErrorBoundary>
-              <div className="flex min-h-screen flex-col">
-                <Navbar />
-                <main className="flex-1">{children}</main>
-                <Footer />
-              </div>
-            </AuthErrorBoundary>
+            <CartProvider>
+              <AuthErrorBoundary>
+                <div className="flex min-h-screen flex-col">
+                  <Navbar />
+                  <main className="flex-1">{children}</main>
+                  <Footer />
+                </div>
+              </AuthErrorBoundary>
+            </CartProvider>
           </AuthProvider>
           <Toaster />
         </ThemeProvider>

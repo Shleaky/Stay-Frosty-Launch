@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Menu, X, User } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
+import { Cart } from "@/components/cart"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,14 +71,19 @@ export default function ClientNavbar() {
           <Link href="/services" className="text-lg font-medium hover:text-slushie-blue transition-colors">
             Services
           </Link>
-          <Link href="/booking" className="text-lg font-medium hover:text-slushie-pink transition-colors">
+          <Link href="/products" className="text-lg font-medium hover:text-slushie-pink transition-colors">
+            Products
+          </Link>
+          <Link href="/booking" className="text-lg font-medium hover:text-slushie-green transition-colors">
             Book Now
           </Link>
-          <Link href="/contact" className="text-lg font-medium hover:text-slushie-green transition-colors">
+          <Link href="/contact" className="text-lg font-medium hover:text-slushie-blue transition-colors">
             Contact
           </Link>
         </nav>
         <div className="flex items-center gap-4">
+          <Cart />
+
           {user ? (
             <div className="hidden md:block">
               <DropdownMenu>
@@ -134,15 +140,22 @@ export default function ClientNavbar() {
             Services
           </Link>
           <Link
-            href="/booking"
+            href="/products"
             className="text-lg font-medium hover:text-slushie-pink transition-colors"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Products
+          </Link>
+          <Link
+            href="/booking"
+            className="text-lg font-medium hover:text-slushie-green transition-colors"
             onClick={() => setIsMenuOpen(false)}
           >
             Book Now
           </Link>
           <Link
             href="/contact"
-            className="text-lg font-medium hover:text-slushie-green transition-colors"
+            className="text-lg font-medium hover:text-slushie-blue transition-colors"
             onClick={() => setIsMenuOpen(false)}
           >
             Contact

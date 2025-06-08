@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { updateBookingPaymentStatus } from "@/app/actions/payment-actions"
+import { updateOrderPaymentStatus } from "@/app/actions/product-actions"
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -33,12 +34,16 @@ export async function POST(req: NextRequest) {
       const paymentIntent = event.data.object as Stripe.PaymentIntent
       console.log("PaymentIntent was successful:", paymentIntent.id)
 
-      // Extract booking ID from metadata
+      // Extract metadata
       const bookingId = paymentIntent.metadata.booking_id
+      const orderId = paymentIntent.metadata.order_id
 
       if (bookingId) {
         // Update booking status in Supabase
         await updateBookingPaymentStatus(bookingId, paymentIntent.id, "paid")
+      } else if (orderId) {
+        // Update product order status in Supabase
+        await updateOrderPaymentStatus(orderId, paymentIntent.id, "paid")
       }
       break
 
@@ -46,12 +51,16 @@ export async function POST(req: NextRequest) {
       const failedPaymentIntent = event.data.object as Stripe.PaymentIntent
       console.log("Payment failed:", failedPaymentIntent.id)
 
-      // Extract booking ID from metadata
+      // Extract metadata
       const failedBookingId = failedPaymentIntent.metadata.booking_id
+      const failedOrderId = failedPaymentIntent.metadata.order_id
 
       if (failedBookingId) {
         // Update booking status in Supabase
         await updateBookingPaymentStatus(failedBookingId, failedPaymentIntent.id, "failed")
+      } else if (failedOrderId) {
+        // Update product order status in Supabase
+        await updateOrderPaymentStatus(failedOrderId, failedPaymentIntent.id, "failed")
       }
       break
 
