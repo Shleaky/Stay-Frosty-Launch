@@ -251,7 +251,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold">Service Area</h3>
-                      <p className="text-muted-foreground">Greater Metro Area & Surrounding Cities</p>
+                      <p className="text-muted-foreground"> Brisbane Greater Metro Area & Surrounding Cities</p>
                     </div>
                   </div>
                 </CardContent>
