@@ -5,9 +5,17 @@ export async function middleware(request: NextRequest) {
   try {
     const response = NextResponse.next()
 
-    // Get the session token from cookies
-    const accessToken = request.cookies.get("sb-access-token")?.value
-    const refreshToken = request.cookies.get("sb-refresh-token")?.value
+    // Get Supabase session cookies - these are the actual cookie names Supabase uses
+    const supabaseAuthToken = request.cookies.get("sb-kzmfwad4p84q2npcqdet-auth-token")?.value
+    const supabaseAuthTokenLegacy = request.cookies.get("supabase-auth-token")?.value
+
+    // Check for any Supabase auth cookies (they can have different patterns)
+    const authCookies = request.cookies
+      .getAll()
+      .filter(
+        (cookie) =>
+          cookie.name.includes("supabase") || cookie.name.includes("sb-") || cookie.name.includes("auth-token"),
+      )
 
     const { pathname } = request.nextUrl
 
@@ -19,19 +27,36 @@ export async function middleware(request: NextRequest) {
     const authPaths = ["/auth/login", "/auth/signup"]
     const isAuthPath = authPaths.some((path) => pathname.startsWith(path))
 
-    // Simple session check based on token presence
-    const hasSession = !!(accessToken && refreshToken)
+    // More lenient session detection
+    const hasSession = !!(supabaseAuthToken || supabaseAuthTokenLegacy || authCookies.length > 0)
 
     console.log(
-      `Middleware: ${pathname}, HasSession: ${hasSession}, Protected: ${isProtectedPath}, Auth: ${isAuthPath}`,
+      `Middleware: ${pathname}, HasSession: ${hasSession}, AuthCookies: ${authCookies.length}, Protected: ${isProtectedPath}, Auth: ${isAuthPath}`,
     )
 
-    // If user is not signed in and trying to access protected route
-    if (!hasSession && isProtectedPath) {
-      console.log(`Redirecting unauthenticated user from ${pathname} to login`)
-      const redirectUrl = new URL("/auth/login", request.url)
-      redirectUrl.searchParams.set("next", pathname)
-      return NextResponse.redirect(redirectUrl)
+    // If we're on a protected path and there's any doubt about auth status, let the client handle it
+    // This prevents redirect loops while the client-side auth is initializing
+    if (isProtectedPath && !hasSession) {
+      // Only redirect if we're certain there's no session
+      // Add a small delay to allow client-side auth to initialize
+      const hasAnyAuthCookie = request.cookies
+        .getAll()
+        .some(
+          (cookie) =>
+            cookie.name.toLowerCase().includes("auth") ||
+            cookie.name.toLowerCase().includes("session") ||
+            cookie.name.toLowerCase().includes("supabase") ||
+            cookie.name.toLowerCase().includes("sb-"),
+        )
+
+      if (!hasAnyAuthCookie) {
+        console.log(`Redirecting unauthenticated user from ${pathname} to login`)
+        const redirectUrl = new URL("/auth/login", request.url)
+        redirectUrl.searchParams.set("next", pathname)
+        return NextResponse.redirect(redirectUrl)
+      } else {
+        console.log(`Allowing access to ${pathname} - auth cookies present, letting client handle`)
+      }
     }
 
     // If user is signed in and trying to access auth pages, redirect to profile

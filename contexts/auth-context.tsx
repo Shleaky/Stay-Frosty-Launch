@@ -30,20 +30,26 @@ const defaultAuthContext: AuthContextType = {
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContext)
 
+// Global flag to prevent multiple auth context initializations
+let globalAuthInitialized = false
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isInitialized, setIsInitialized] = useState(false)
   const router = useRouter()
-  const initializingRef = useRef(false)
+  const mountedRef = useRef(true)
+  const subscriptionRef = useRef<any>(null)
 
   useEffect(() => {
-    // Prevent multiple initializations
-    if (isInitialized || initializingRef.current || typeof window === "undefined") return
+    // Prevent multiple initializations globally
+    if (globalAuthInitialized || typeof window === "undefined") {
+      setIsLoading(false)
+      return
+    }
 
-    initializingRef.current = true
+    globalAuthInitialized = true
 
     const initializeAuth = async () => {
       try {
@@ -64,6 +70,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: sessionError,
         } = await supabase.auth.getSession()
 
+        if (!mountedRef.current) return
+
         if (sessionError) {
           console.error("Error fetching initial session:", sessionError)
           setError(sessionError.message)
@@ -73,91 +81,91 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(initialSession?.user || null)
         }
 
-        setIsInitialized(true)
+        // Set up auth state listener
+        console.log("Setting up auth state listener...")
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (!mountedRef.current) return
+
+          console.log("Auth state changed:", event, session?.user?.email || "No user")
+
+          // Handle different auth events
+          switch (event) {
+            case "INITIAL_SESSION":
+              // Skip if we already have the same session
+              if (session?.user?.id === user?.id) return
+              setSession(session)
+              setUser(session?.user || null)
+              break
+
+            case "SIGNED_IN":
+              console.log("User signed in:", session?.user?.email)
+              setSession(session)
+              setUser(session?.user || null)
+
+              // Handle redirects after sign in
+              const urlParams = new URLSearchParams(window.location.search)
+              const nextUrl = urlParams.get("next")
+
+              if (nextUrl && nextUrl.startsWith("/")) {
+                router.replace(nextUrl)
+              } else if (window.location.pathname.startsWith("/auth/")) {
+                router.replace("/profile")
+              }
+              break
+
+            case "SIGNED_OUT":
+              console.log("User signed out, clearing state")
+              setUser(null)
+              setSession(null)
+
+              // Only redirect if we're on a protected route
+              const currentPath = window.location.pathname
+              const protectedPaths = ["/profile", "/bookings", "/booking", "/admin"]
+
+              if (protectedPaths.some((path) => currentPath.startsWith(path))) {
+                router.replace(`/auth/login?next=${encodeURIComponent(currentPath)}`)
+              }
+              break
+
+            case "TOKEN_REFRESHED":
+              console.log("Token refreshed")
+              setSession(session)
+              setUser(session?.user || null)
+              break
+
+            default:
+              setSession(session)
+              setUser(session?.user || null)
+          }
+        })
+
+        subscriptionRef.current = subscription
       } catch (err) {
         console.error("Unexpected error initializing auth:", err)
-        setError("Failed to initialize authentication")
+        if (mountedRef.current) {
+          setError("Failed to initialize authentication")
+        }
       } finally {
-        setIsLoading(false)
-        initializingRef.current = false
+        if (mountedRef.current) {
+          setIsLoading(false)
+        }
       }
     }
 
     initializeAuth()
-  }, [])
 
-  useEffect(() => {
-    if (!isInitialized || typeof window === "undefined") return
-
-    const supabase = getBrowserClient()
-
-    console.log("Setting up auth state listener...")
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.email || "No user")
-
-      // Handle different auth events
-      switch (event) {
-        case "INITIAL_SESSION":
-          // Only update if different from current state
-          if (session?.user?.id !== user?.id) {
-            setSession(session)
-            setUser(session?.user || null)
-          }
-          break
-
-        case "SIGNED_IN":
-          console.log("User signed in:", session?.user?.email)
-          setSession(session)
-          setUser(session?.user || null)
-
-          // Check for redirect URL
-          const urlParams = new URLSearchParams(window.location.search)
-          const nextUrl = urlParams.get("next")
-
-          if (nextUrl && nextUrl.startsWith("/")) {
-            router.replace(nextUrl)
-          } else if (window.location.pathname.startsWith("/auth/")) {
-            router.replace("/profile")
-          }
-          break
-
-        case "SIGNED_OUT":
-          console.log("User signed out, clearing state and redirecting...")
-          setUser(null)
-          setSession(null)
-
-          // Get current path for redirect logic
-          const currentPath = window.location.pathname
-          const protectedPaths = ["/profile", "/bookings", "/booking", "/admin"]
-
-          // Redirect logic
-          if (protectedPaths.some((path) => currentPath.startsWith(path))) {
-            router.replace(`/auth/login?next=${encodeURIComponent(currentPath)}`)
-          } else if (!currentPath.startsWith("/auth/")) {
-            router.replace("/auth/login")
-          }
-          break
-
-        case "TOKEN_REFRESHED":
-          console.log("Token refreshed")
-          setSession(session)
-          setUser(session?.user || null)
-          break
-
-        default:
-          setSession(session)
-          setUser(session?.user || null)
-      }
-    })
-
+    // Cleanup function
     return () => {
-      console.log("Cleaning up auth state listener")
-      subscription.unsubscribe()
+      console.log("Cleaning up auth context")
+      mountedRef.current = false
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe()
+      }
+      globalAuthInitialized = false
     }
-  }, [isInitialized, router, user?.id])
+  }, [router, user?.id])
 
   const signUp = async (email: string, password: string, metadata: any) => {
     try {
@@ -225,35 +233,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const supabase = getBrowserClient()
 
-      // Clear local state immediately
-      setUser(null)
-      setSession(null)
-
       const { error } = await supabase.auth.signOut()
 
       if (error) {
         console.error("Sign out error:", error)
       }
 
-      // Force redirect regardless of error
-      const currentPath = window.location.pathname
-      const protectedPaths = ["/profile", "/bookings", "/booking", "/admin"]
-
-      if (protectedPaths.some((path) => currentPath.startsWith(path))) {
-        router.replace("/auth/login?message=signed_out")
-      } else {
-        router.replace("/auth/login")
-      }
-
       return { error }
     } catch (err) {
       console.error("Unexpected sign out error:", err)
-
-      // Clear state and redirect even on error
-      setUser(null)
-      setSession(null)
-      router.replace("/auth/login?message=error")
-
       return { error: err instanceof Error ? err : new Error(String(err)) }
     }
   }
@@ -266,8 +254,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         data: { session },
       } = await supabase.auth.getSession()
 
-      setSession(session)
-      setUser(session?.user || null)
+      if (mountedRef.current) {
+        setSession(session)
+        setUser(session?.user || null)
+      }
     } catch (err) {
       console.error("Error refreshing session:", err)
     }
