@@ -38,32 +38,8 @@ export const getBrowserClient = (): SupabaseClient => {
   return browserClient
 }
 
-// Legacy function for backward compatibility
-// Removing the redeclaration of createClient
-// export const createClient = () => {
-//   return getBrowserClient()
-// }
-
 // Server-side client for API routes and server components
 export const createServerSupabaseClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
-  }
-
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  })
-}
-
-// Middleware client for handling authentication in middleware
-export const createMiddlewareSupabaseClient = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
 

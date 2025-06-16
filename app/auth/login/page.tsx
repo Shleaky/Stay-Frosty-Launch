@@ -24,21 +24,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [hasRedirected, setHasRedirected] = useState(false)
 
   // Get message and next from URL params
   const message = searchParams.get("message")
   const next = searchParams.get("next")
 
-  // Redirect if already logged in (but only once)
+  // Redirect if already logged in
   useEffect(() => {
-    if (user && !hasRedirected && !authLoading) {
+    if (user && !authLoading) {
       console.log("User already logged in, redirecting...")
-      setHasRedirected(true)
       const redirectTo = next || "/profile"
       router.replace(redirectTo)
     }
-  }, [user, router, next, hasRedirected, authLoading])
+  }, [user, router, next, authLoading])
 
   // Show message based on URL params
   useEffect(() => {
@@ -59,7 +57,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (isLoading || hasRedirected) return
+    if (isLoading) return
 
     setIsLoading(true)
     setError(null)
@@ -84,8 +82,7 @@ export default function LoginPage() {
           description: "You have been logged in successfully.",
         })
 
-        // Set redirect flag and redirect
-        setHasRedirected(true)
+        // Redirect
         const redirectTo = next || "/profile"
         router.replace(redirectTo)
       }
@@ -102,13 +99,13 @@ export default function LoginPage() {
     }
   }
 
-  // Show loading while checking authentication or if already redirected
-  if (authLoading || (user && !hasRedirected)) {
+  // Show loading while checking authentication
+  if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-slushie-blue"></div>
-          <p className="mt-2 text-sm text-muted-foreground">{user ? "Redirecting..." : "Loading..."}</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-500"></div>
+          <p className="mt-2 text-sm text-gray-400">Loading...</p>
         </div>
       </div>
     )
@@ -122,22 +119,19 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-black py-12">
       <div className="relative w-full max-w-md px-4">
-        <div className="absolute inset-0 z-0 opacity-30 splatter-bg"></div>
-        <Card className="relative z-10 border border-white/10 bg-black/80 backdrop-blur-sm">
+        <Card className="border border-gray-700 bg-gray-900">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold text-center">
-              <span className="bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink bg-clip-text text-transparent">
-                Log In
-              </span>
-            </CardTitle>
-            <CardDescription className="text-center">Enter your credentials to access your account</CardDescription>
+            <CardTitle className="text-2xl font-bold text-center text-white">Log In</CardTitle>
+            <CardDescription className="text-center text-gray-400">
+              Enter your credentials to access your account
+            </CardDescription>
           </CardHeader>
 
           {next && (
             <div className="px-6 pb-4">
-              <Alert className="border-slushie-blue/50 bg-slushie-blue/10">
+              <Alert className="border-blue-500/50 bg-blue-500/10">
                 <Info className="h-4 w-4" />
-                <AlertDescription className="text-slushie-blue">
+                <AlertDescription className="text-blue-400">
                   Please log in to access{" "}
                   {next === "/profile" ? "your profile" : next === "/bookings" ? "your bookings" : "this page"}.
                 </AlertDescription>
@@ -148,7 +142,9 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-white">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -156,13 +152,15 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="bg-black/50 border-white/20"
+                  className="bg-gray-800 border-gray-600 text-white"
                   disabled={isLoading}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-white">
+                  Password
+                </Label>
                 <Input
                   id="password"
                   type="password"
@@ -170,28 +168,28 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="bg-black/50 border-white/20"
+                  className="bg-gray-800 border-gray-600 text-white"
                   disabled={isLoading}
                 />
               </div>
 
-              {error && <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-500">{error}</div>}
+              {error && <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-400">{error}</div>}
             </CardContent>
 
             <CardFooter className="flex flex-col space-y-4">
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink text-black font-bold splash-button"
-                disabled={isLoading || hasRedirected}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                disabled={isLoading}
               >
                 {isLoading ? "Logging in..." : "Log In"}
               </Button>
 
-              <div className="text-center text-sm">
+              <div className="text-center text-sm text-gray-400">
                 Don't have an account?{" "}
                 <Link
                   href={`/auth/signup${next ? `?next=${encodeURIComponent(next)}` : ""}`}
-                  className="text-slushie-green hover:underline"
+                  className="text-blue-400 hover:underline"
                 >
                   Sign up
                 </Link>
