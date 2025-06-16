@@ -1,7 +1,7 @@
 import type { User } from "@supabase/supabase-js"
 
 // List of admin email addresses
-const ADMIN_EMAILS = ["admin@stayfrosty.com", "stayfrastyco@gmail.com"]
+const ADMIN_EMAILS = ["admin@stayfrosty.com", "stayfrastyco@gmail.com", "codypayne.it@gmail.com"]
 
 /**
  * Check if a user has admin privileges
