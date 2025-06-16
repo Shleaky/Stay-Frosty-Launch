@@ -85,8 +85,12 @@ export default function ProfilePage() {
 
     if (!user) {
       console.log("No user found, redirecting to login...")
-      router.push("/auth/login?next=/profile")
-      return
+      // Add a small delay to prevent race conditions
+      const timer = setTimeout(() => {
+        router.push("/auth/login?next=/profile")
+      }, 100)
+
+      return () => clearTimeout(timer)
     }
   }, [user, authLoading, router])
 

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useRef } from "react"
 import type { Session, User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 import { getBrowserClient } from "@/lib/supabase"
@@ -30,31 +30,30 @@ const defaultAuthContext: AuthContextType = {
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContext)
 
+// Singleton client instance
+let supabaseClientInstance: any = null
+
+function getSupabaseClient() {
+  if (!supabaseClientInstance && typeof window !== "undefined") {
+    supabaseClientInstance = getBrowserClient()
+  }
+  return supabaseClientInstance
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
-  const [supabaseClient, setSupabaseClient] = useState<any>(null)
   const router = useRouter()
-
-  // Initialize client only once
-  useEffect(() => {
-    if (typeof window !== "undefined" && !supabaseClient) {
-      try {
-        const client = getBrowserClient()
-        setSupabaseClient(client)
-      } catch (err) {
-        console.error("Failed to get Supabase client:", err)
-        setError("Failed to initialize authentication")
-      }
-    }
-  }, [supabaseClient])
+  const initializingRef = useRef(false)
 
   useEffect(() => {
     // Prevent multiple initializations
-    if (isInitialized || !supabaseClient) return
+    if (isInitialized || initializingRef.current) return
+
+    initializingRef.current = true
 
     const initializeAuth = async () => {
       try {
@@ -67,11 +66,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
+        const supabase = getSupabaseClient()
+        if (!supabase) {
+          setError("Failed to initialize Supabase client")
+          setIsLoading(false)
+          return
+        }
+
         // Get initial session
         const {
           data: { session: initialSession },
           error: sessionError,
-        } = await supabaseClient.auth.getSession()
+        } = await supabase.auth.getSession()
 
         if (sessionError) {
           console.error("Error fetching initial session:", sessionError)
@@ -88,66 +94,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError("Failed to initialize authentication")
       } finally {
         setIsLoading(false)
+        initializingRef.current = false
       }
     }
 
     initializeAuth()
-  }, [isInitialized, supabaseClient])
+  }, [])
 
   useEffect(() => {
-    if (!isInitialized || !supabaseClient) return
+    if (!isInitialized) return
+
+    const supabase = getSupabaseClient()
+    if (!supabase) return
 
     console.log("Setting up auth state listener...")
 
     const {
       data: { subscription },
-    } = supabaseClient.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, session?.user?.email || "No user")
 
-      // Prevent rapid state changes
-      if (event === "INITIAL_SESSION") {
-        // Only update if different from current state
-        if (session?.user?.id !== user?.id) {
+      // Handle different auth events
+      switch (event) {
+        case "INITIAL_SESSION":
+          // Only update if different from current state
+          if (session?.user?.id !== user?.id) {
+            setSession(session)
+            setUser(session?.user || null)
+          }
+          break
+
+        case "SIGNED_IN":
+          console.log("User signed in:", session?.user?.email)
           setSession(session)
           setUser(session?.user || null)
-        }
-        return
-      }
 
-      setSession(session)
-      setUser(session?.user || null)
+          // Check for redirect URL
+          const urlParams = new URLSearchParams(window.location.search)
+          const nextUrl = urlParams.get("next")
 
-      // Handle sign out event
-      if (event === "SIGNED_OUT") {
-        console.log("User signed out, clearing state and redirecting...")
+          if (nextUrl && nextUrl.startsWith("/")) {
+            router.replace(nextUrl)
+          } else if (window.location.pathname.startsWith("/auth/")) {
+            router.replace("/profile")
+          }
+          break
 
-        // Clear state immediately
-        setUser(null)
-        setSession(null)
+        case "SIGNED_OUT":
+          console.log("User signed out, clearing state and redirecting...")
+          setUser(null)
+          setSession(null)
 
-        // Get current path for redirect logic
-        const currentPath = window.location.pathname
-        const protectedPaths = ["/profile", "/bookings", "/booking"]
+          // Get current path for redirect logic
+          const currentPath = window.location.pathname
+          const protectedPaths = ["/profile", "/bookings", "/booking", "/admin"]
 
-        // Redirect logic
-        if (protectedPaths.some((path) => currentPath.startsWith(path))) {
-          router.replace(`/auth/login?next=${encodeURIComponent(currentPath)}`)
-        } else {
-          router.replace("/auth/login")
-        }
-      }
+          // Redirect logic
+          if (protectedPaths.some((path) => currentPath.startsWith(path))) {
+            router.replace(`/auth/login?next=${encodeURIComponent(currentPath)}`)
+          } else if (!currentPath.startsWith("/auth/")) {
+            router.replace("/auth/login")
+          }
+          break
 
-      // Handle sign in event
-      if (event === "SIGNED_IN" && session?.user) {
-        console.log("User signed in:", session.user.email)
+        case "TOKEN_REFRESHED":
+          console.log("Token refreshed")
+          setSession(session)
+          setUser(session?.user || null)
+          break
 
-        // Check for redirect URL
-        const urlParams = new URLSearchParams(window.location.search)
-        const nextUrl = urlParams.get("next")
-
-        if (nextUrl && nextUrl.startsWith("/")) {
-          router.replace(nextUrl)
-        }
+        default:
+          setSession(session)
+          setUser(session?.user || null)
       }
     })
 
@@ -155,15 +173,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Cleaning up auth state listener")
       subscription.unsubscribe()
     }
-  }, [isInitialized, router, user?.id, supabaseClient])
+  }, [isInitialized, router, user?.id])
 
   const signUp = async (email: string, password: string, metadata: any) => {
     try {
       console.log("Signing up with:", { email, metadata })
 
-      if (!supabaseClient) throw new Error("Supabase client not available")
+      const supabase = getSupabaseClient()
+      if (!supabase) throw new Error("Supabase client not available")
 
-      const { data, error } = await supabaseClient.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -197,9 +216,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Signing in with:", email)
 
-      if (!supabaseClient) throw new Error("Supabase client not available")
+      const supabase = getSupabaseClient()
+      if (!supabase) throw new Error("Supabase client not available")
 
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -221,13 +241,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Initiating sign out...")
 
-      if (!supabaseClient) throw new Error("Supabase client not available")
+      const supabase = getSupabaseClient()
+      if (!supabase) throw new Error("Supabase client not available")
 
       // Clear local state immediately
       setUser(null)
       setSession(null)
 
-      const { error } = await supabaseClient.auth.signOut()
+      const { error } = await supabase.auth.signOut()
 
       if (error) {
         console.error("Sign out error:", error)
@@ -235,7 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Force redirect regardless of error
       const currentPath = window.location.pathname
-      const protectedPaths = ["/profile", "/bookings", "/booking"]
+      const protectedPaths = ["/profile", "/bookings", "/booking", "/admin"]
 
       if (protectedPaths.some((path) => currentPath.startsWith(path))) {
         router.replace("/auth/login?message=signed_out")
@@ -258,11 +279,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = async () => {
     try {
-      if (!supabaseClient) return
+      const supabase = getSupabaseClient()
+      if (!supabase) return
 
       const {
         data: { session },
-      } = await supabaseClient.auth.getSession()
+      } = await supabase.auth.getSession()
 
       setSession(session)
       setUser(session?.user || null)

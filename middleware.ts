@@ -1,21 +1,15 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createMiddlewareClient } from "@/lib/supabase"
 
 export async function middleware(request: NextRequest) {
   try {
     const response = NextResponse.next()
 
     // Create a Supabase client configured for middleware
-    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false,
-      },
-    })
+    const supabase = createMiddlewareClient(request, response)
 
-    // Get session from request cookies
+    // Refresh session if expired - required for Server Components
     const {
       data: { session },
     } = await supabase.auth.getSession()
@@ -23,7 +17,7 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
 
     // Protected routes that require authentication
-    const protectedPaths = ["/profile", "/bookings", "/booking"]
+    const protectedPaths = ["/profile", "/bookings", "/booking", "/admin"]
     const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path))
 
     // Auth routes that should redirect if already authenticated
