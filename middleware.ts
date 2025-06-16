@@ -1,23 +1,13 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createMiddlewareSupabaseClient } from "@/lib/supabase"
 
 export async function middleware(request: NextRequest) {
   try {
     const response = NextResponse.next()
 
-    // Create a Supabase client configured for middleware
-    const supabase = createMiddlewareSupabaseClient(request, response)
-
-    // Refresh session if expired - required for Server Components
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession()
-
-    if (error) {
-      console.error("Middleware auth error:", error)
-    }
+    // Get the session token from cookies
+    const accessToken = request.cookies.get("sb-access-token")?.value
+    const refreshToken = request.cookies.get("sb-refresh-token")?.value
 
     const { pathname } = request.nextUrl
 
@@ -29,12 +19,15 @@ export async function middleware(request: NextRequest) {
     const authPaths = ["/auth/login", "/auth/signup"]
     const isAuthPath = authPaths.some((path) => pathname.startsWith(path))
 
+    // Simple session check based on token presence
+    const hasSession = !!(accessToken && refreshToken)
+
     console.log(
-      `Middleware: ${pathname}, Session: ${session?.user?.email || "None"}, Protected: ${isProtectedPath}, Auth: ${isAuthPath}`,
+      `Middleware: ${pathname}, HasSession: ${hasSession}, Protected: ${isProtectedPath}, Auth: ${isAuthPath}`,
     )
 
     // If user is not signed in and trying to access protected route
-    if (!session && isProtectedPath) {
+    if (!hasSession && isProtectedPath) {
       console.log(`Redirecting unauthenticated user from ${pathname} to login`)
       const redirectUrl = new URL("/auth/login", request.url)
       redirectUrl.searchParams.set("next", pathname)
@@ -42,7 +35,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // If user is signed in and trying to access auth pages, redirect to profile
-    if (session && isAuthPath) {
+    if (hasSession && isAuthPath) {
       console.log(`Redirecting authenticated user from ${pathname} to profile`)
       return NextResponse.redirect(new URL("/profile", request.url))
     }
