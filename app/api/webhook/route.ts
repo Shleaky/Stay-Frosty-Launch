@@ -1,74 +1,72 @@
-import { NextResponse } from "next/server"
-import { stripe } from "@/lib/stripe"
-import { headers } from "next/headers"
-import { upsertProductRecord, upsertPriceRecord, manageSubscriptionStatusChange } from "@/lib/supabase-admin"
+import { type NextRequest, NextResponse } from "next/server"
+import Stripe from "stripe"
+import { updateBookingPaymentStatus } from "@/app/actions/payment-actions"
+import { updateOrderPaymentStatus } from "@/app/actions/product-actions"
 
-const relevantEvents = new Set([
-  "product.created",
-  "product.updated",
-  "price.created",
-  "price.updated",
-  "checkout.session.completed",
-  "customer.subscription.created",
-  "customer.subscription.updated",
-  "customer.subscription.deleted",
-])
+// Initialize Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2023-10-16",
+})
 
-export async function POST(req: Request) {
-  const body = await req.text()
-  const signature = headers().get("Stripe-Signature")
+// This is your Stripe CLI webhook secret for testing your endpoint locally
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
 
-  const secret = process.env.STRIPE_WEBHOOK_SECRET
-  if (!signature || !secret) return new NextResponse("Stripe webhook secret not found", { status: 400 })
+export async function POST(req: NextRequest) {
+  const payload = await req.text()
+  const sig = req.headers.get("stripe-signature")
 
   let event
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, secret)
-  } catch (err: any) {
-    console.log("Webhook signature verification failed.", err.message)
-    return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 })
-  }
-
-  const eventType = event.type
-
-  if (relevantEvents.has(eventType)) {
-    try {
-      switch (eventType) {
-        case "product.created":
-        case "product.updated":
-          await upsertProductRecord(event.data.object as any)
-          break
-        case "price.created":
-        case "price.updated":
-          await upsertPriceRecord(event.data.object as any)
-          break
-        case "customer.subscription.created":
-        case "customer.subscription.updated":
-        case "customer.subscription.deleted":
-          const subscription = event.data.object as any
-          await manageSubscriptionStatusChange(
-            subscription.id,
-            subscription.customer,
-            eventType === "customer.subscription.created",
-          )
-          break
-        case "checkout.session.completed":
-          const checkoutSession = event.data.object as any
-          if (checkoutSession.mode === "subscription") {
-            const subscriptionId = checkoutSession.subscription
-            await manageSubscriptionStatusChange(subscriptionId, checkoutSession.customer, true)
-          }
-
-          break
-        default:
-          throw new Error("Unhandled relevant event!")
-      }
-    } catch (error) {
-      console.log(error)
-      return new NextResponse('Webhook error: "Webhook handler failed. View logs."', { status: 400 })
+    if (!sig || !endpointSecret) {
+      return NextResponse.json({ error: "Missing signature or endpoint secret" }, { status: 400 })
     }
+
+    event = stripe.webhooks.constructEvent(payload, sig, endpointSecret)
+  } catch (err) {
+    console.error("Webhook signature verification failed:", err)
+    return NextResponse.json({ error: "Webhook signature verification failed" }, { status: 400 })
   }
 
-  return NextResponse.json({ received: true }, { status: 200 })
+  // Handle the event
+  switch (event.type) {
+    case "payment_intent.succeeded":
+      const paymentIntent = event.data.object as Stripe.PaymentIntent
+      console.log("PaymentIntent was successful:", paymentIntent.id)
+
+      // Extract metadata
+      const bookingId = paymentIntent.metadata.booking_id
+      const orderId = paymentIntent.metadata.order_id
+
+      if (bookingId) {
+        // Update booking status in Supabase
+        await updateBookingPaymentStatus(bookingId, paymentIntent.id, "paid")
+      } else if (orderId) {
+        // Update product order status in Supabase
+        await updateOrderPaymentStatus(orderId, paymentIntent.id, "paid")
+      }
+      break
+
+    case "payment_intent.payment_failed":
+      const failedPaymentIntent = event.data.object as Stripe.PaymentIntent
+      console.log("Payment failed:", failedPaymentIntent.id)
+
+      // Extract metadata
+      const failedBookingId = failedPaymentIntent.metadata.booking_id
+      const failedOrderId = failedPaymentIntent.metadata.order_id
+
+      if (failedBookingId) {
+        // Update booking status in Supabase
+        await updateBookingPaymentStatus(failedBookingId, failedPaymentIntent.id, "failed")
+      } else if (failedOrderId) {
+        // Update product order status in Supabase
+        await updateOrderPaymentStatus(failedOrderId, failedPaymentIntent.id, "failed")
+      }
+      break
+
+    default:
+      console.log(`Unhandled event type ${event.type}`)
+  }
+
+  return NextResponse.json({ received: true })
 }
