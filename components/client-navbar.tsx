@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { isAdmin } from "@/lib/admin-utils"
 
 export default function ClientNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -101,6 +102,11 @@ export default function ClientNavbar() {
                   <DropdownMenuItem asChild>
                     <Link href="/bookings">My Bookings</Link>
                   </DropdownMenuItem>
+                  {isAdmin(user) && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin">Admin Dashboard</Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut} className="text-red-400 focus:text-red-400">
                     Sign Out
@@ -176,6 +182,15 @@ export default function ClientNavbar() {
               >
                 My Bookings
               </Link>
+              {isAdmin(user) && (
+                <Link
+                  href="/admin"
+                  className="text-lg font-medium hover:text-slushie-green transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Admin Dashboard
+                </Link>
+              )}
               <Button
                 variant="ghost"
                 className="justify-start px-0 text-lg font-medium hover:text-red-400 transition-colors text-red-400"

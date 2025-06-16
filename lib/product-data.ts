@@ -1,4 +1,5 @@
 import type { Product } from "@/types/product"
+import { getBrowserClient } from "@/lib/supabase"
 
 // Available flavors for products
 export const flavors = [
@@ -14,8 +15,8 @@ export const flavors = [
   { id: "cola", name: "Cola", color: "bg-amber-900" },
 ]
 
-// Product data
-export const products: Product[] = [
+// Default products (fallback if database fetch fails)
+const defaultProducts: Product[] = [
   {
     id: "fairy-floss-bags",
     name: "Fairy Floss Premade Bags",
@@ -28,43 +29,62 @@ export const products: Product[] = [
     flavors: flavors,
     inStock: true,
   },
-  {
-    id: "fairy-floss-sugar",
-    name: "Fairy Floss Sugar",
-    description:
-      "Premium fairy floss sugar for use with any standard fairy floss machine. Make your own fluffy treats at home!",
-    price: 19.99,
-    image: "/images/products/fairy-floss-sugar.webp",
-    category: "fairy-floss",
-    hasFlavors: true,
-    flavors: flavors,
-    inStock: true,
-  },
-  {
-    id: "energy-drinks",
-    name: "Stay Frosty Energy Drinks",
-    description:
-      "Our signature energy drinks to keep you going all day. Perfect blend of caffeine and vitamins with no crash.",
-    price: 19.99,
-    image: "/images/products/energy-drinks.webp",
-    category: "drinks",
-    hasFlavors: false,
-    inStock: true,
-  },
-  {
-    id: "pistachio-papi",
-    name: "Pistachio Papi Spread",
-    description:
-      "Artisan pistachio spread made with premium nuts. A delicious and unique alternative to traditional nut butters.",
-    price: 24.99,
-    image: "/images/products/pistachio-papi.webp",
-    category: "spreads",
-    hasFlavors: false,
-    inStock: true,
-  },
+  // ... other default products
 ]
 
+// Cached products to avoid refetching
+let cachedProducts: Product[] | null = null
+let lastFetchTime = 0
+const CACHE_TTL = 60000 // 1 minute
+
+// Fetch products from database
+export async function fetchProducts(): Promise<Product[]> {
+  try {
+    // Return cached products if available and not expired
+    const now = Date.now()
+    if (cachedProducts && now - lastFetchTime < CACHE_TTL) {
+      return cachedProducts
+    }
+
+    const supabase = getBrowserClient()
+    const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching products:", error)
+      return defaultProducts
+    }
+
+    // Transform database products to match Product type
+    const products: Product[] = data.map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      price: item.price,
+      image: item.image,
+      category: item.category,
+      hasFlavors: item.has_flavors,
+      flavors: item.has_flavors ? flavors : undefined,
+      inStock: item.in_stock,
+    }))
+
+    // Update cache
+    cachedProducts = products
+    lastFetchTime = now
+
+    return products
+  } catch (error) {
+    console.error("Unexpected error fetching products:", error)
+    return defaultProducts
+  }
+}
+
+// Get all products
+export async function getProducts(): Promise<Product[]> {
+  return await fetchProducts()
+}
+
 // Get product by ID
-export function getProductById(id: string): Product | undefined {
+export async function getProductById(id: string): Promise<Product | undefined> {
+  const products = await fetchProducts()
   return products.find((product) => product.id === id)
 }

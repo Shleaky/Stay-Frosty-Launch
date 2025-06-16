@@ -1,12 +1,31 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ProductCard } from "@/components/product-card"
-import { products } from "@/lib/product-data"
+import { getProducts } from "@/lib/product-data"
+import type { Product } from "@/types"
+import { Loader2 } from "lucide-react"
 
 export default function ProductsPage() {
+  const [products, setProducts] = useState<Product[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [category, setCategory] = useState<string>("all")
+
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const productData = await getProducts()
+        setProducts(productData)
+      } catch (error) {
+        console.error("Error loading products:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadProducts()
+  }, [])
 
   // Get unique categories
   const categories = ["all", ...new Set(products.map((product) => product.category))]
@@ -16,6 +35,11 @@ export default function ProductsPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-black">
+      {isLoading && (
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-slushie-blue" />
+        </div>
+      )}
       {/* Hero Section */}
       <section className="relative py-16 overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-30 splatter-bg"></div>

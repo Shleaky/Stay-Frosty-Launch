@@ -10,6 +10,8 @@ import type { Product } from "@/types/product"
 import { useCart } from "@/contexts/cart-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { getProductById } from "@/lib/product-data"
+import { toast } from "@/components/ui/use-toast"
 
 interface ProductCardProps {
   product: Product
@@ -22,9 +24,19 @@ export function ProductCard({ product }: ProductCardProps) {
   const { user } = useAuth()
   const router = useRouter()
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!user) {
       router.push("/auth/login?next=/products")
+      return
+    }
+
+    const productDetails = await getProductById(product.id)
+    if (!productDetails) {
+      toast({
+        title: "Error",
+        description: "Product not found",
+        variant: "destructive",
+      })
       return
     }
 
