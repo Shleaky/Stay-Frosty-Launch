@@ -1,138 +1,50 @@
-"use server"
-
-import { createServerClient } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase"
 import { revalidatePath } from "next/cache"
-import { bookingFormSchema, validate } from "@/lib/validators"
 
-export type SlushieBookingFormData = {
-  userId: string | null
-  bookingDate: string
-  machineType: string
-  packageType: string
-  flavors: string[]
-  eventType: string
-  guestCount: number
-  userName: string
-  userEmail: string
-  userPhone: string
-  address: string
-  comments?: string
-  totalPrice: number
-}
+export async function createBooking(formData: FormData) {
+  "use server"
 
-export async function createSlushieBooking(formData: SlushieBookingFormData) {
-  try {
-    // Validate form data
-    const validation = await validate(bookingFormSchema, formData)
-    if (!validation.success) {
-      return { success: false, error: "Validation failed", validationErrors: validation.errors }
-    }
+  const supabase = createServerSupabaseClient()
 
-    const supabase = createServerClient()
+  const guest_name = formData.get("guest_name") as string
+  const guest_email = formData.get("guest_email") as string
+  const room_id = formData.get("room_id") as string
+  const check_in = formData.get("check_in") as string
+  const check_out = formData.get("check_out") as string
 
-    const bookingData = {
-      user_id: formData.userId,
-      booking_date: formData.bookingDate,
-      machine_type: formData.machineType,
-      package_type: formData.packageType,
-      flavors: formData.flavors,
-      event_type: formData.eventType,
-      guest_count: formData.guestCount,
-      user_name: formData.userName,
-      user_email: formData.userEmail,
-      user_phone: formData.userPhone,
-      address: formData.address,
-      comments: formData.comments,
-      total_price: formData.totalPrice,
-      status: "pending",
-    }
+  const { data, error } = await supabase
+    .from("bookings")
+    .insert({
+      guest_name,
+      guest_email,
+      room_id,
+      check_in,
+      check_out,
+    })
+    .select()
+    .single()
 
-    const { data, error } = await supabase.from("slushie_bookings").insert([bookingData]).select()
-
-    if (error) {
-      console.error("Error creating slushie booking:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/profile")
-    revalidatePath("/bookings")
-
-    return { success: true, data: data[0] }
-  } catch (error) {
-    console.error("Unexpected error creating slushie booking:", error)
-    return { success: false, error: "An unexpected error occurred" }
+  if (error) {
+    console.log(error)
+    return { message: "Failed to create booking" }
   }
+
+  revalidatePath("/bookings")
+  return { message: "Booking created successfully" }
 }
 
-export async function getUserSlushieBookings(userId: string) {
-  try {
-    if (!userId) {
-      return { success: false, error: "User ID is required" }
-    }
+export async function deleteBooking(id: string) {
+  "use server"
 
-    const supabase = createServerClient()
+  const supabase = createServerSupabaseClient()
 
-    const { data, error } = await supabase
-      .from("slushie_bookings")
-      .select("*")
-      .eq("user_id", userId)
-      .order("booking_date", { ascending: true })
+  const { error } = await supabase.from("bookings").delete().eq("id", id)
 
-    if (error) {
-      console.error("Error fetching user slushie bookings:", error)
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, data }
-  } catch (error) {
-    console.error("Unexpected error fetching user slushie bookings:", error)
-    return { success: false, error: "An unexpected error occurred" }
+  if (error) {
+    console.log(error)
+    return { message: "Failed to delete booking" }
   }
+
+  revalidatePath("/bookings")
+  return { message: "Booking deleted successfully" }
 }
-
-export async function cancelSlushieBooking(bookingId: string, userId: string) {
-  try {
-    if (!bookingId || !userId) {
-      return { success: false, error: "Booking ID and User ID are required" }
-    }
-
-    const supabase = createServerClient()
-
-    // First verify that this booking belongs to the user
-    const { data: bookingData, error: fetchError } = await supabase
-      .from("slushie_bookings")
-      .select("*")
-      .eq("id", bookingId)
-      .eq("user_id", userId)
-      .single()
-
-    if (fetchError || !bookingData) {
-      console.error("Error fetching slushie booking to cancel:", fetchError)
-      return { success: false, error: "Booking not found or not authorized" }
-    }
-
-    // Now update the booking status
-    const { error: updateError } = await supabase
-      .from("slushie_bookings")
-      .update({ status: "cancelled" })
-      .eq("id", bookingId)
-      .eq("user_id", userId)
-
-    if (updateError) {
-      console.error("Error cancelling slushie booking:", updateError)
-      return { success: false, error: updateError.message }
-    }
-
-    revalidatePath("/profile")
-    revalidatePath("/bookings")
-
-    return { success: true }
-  } catch (error) {
-    console.error("Unexpected error cancelling slushie booking:", error)
-    return { success: false, error: "An unexpected error occurred" }
-  }
-}
-
-// For backward compatibility with old code
-export const getUserBookings = getUserSlushieBookings
-export const cancelBooking = cancelSlushieBooking

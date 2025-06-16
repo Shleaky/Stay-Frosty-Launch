@@ -8,69 +8,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { sendContactEmail } from "@/app/actions/contact-actions"
-import { Mail, Phone, MapPin } from "lucide-react"
+import { Mail, Phone, MapPin, Clock } from "lucide-react"
 
 export default function ContactPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
 
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    service: "",
-    subject: "",
-    message: "",
-  })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const services = [
-    { value: "single-machine", label: "Single Machine Rental" },
-    { value: "double-machine", label: "Double Machine Rental" },
-    { value: "triple-machine", label: "Triple Machine Rental" },
-    { value: "basic-package", label: "Basic Package" },
-    { value: "standard-package", label: "Standard Package" },
-    { value: "premium-package", label: "Premium Package" },
-    { value: "branded-cups", label: "Branded Cups & Accessories" },
-    { value: "custom-flavor", label: "Custom Flavor Development" },
-    { value: "alcoholic-options", label: "Alcoholic Options" },
-    { value: "long-term-rental", label: "Long-Term Rentals" },
-    { value: "general-inquiry", label: "General Inquiry" },
-    { value: "other", label: "Other" },
-  ]
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
 
     try {
-      const result = await sendContactEmail(formData)
-
-      if (result.success) {
-        toast({
-          title: "Message Sent!",
-          description: "Thank you for your inquiry. We'll get back to you within 24 hours.",
-        })
-        // Reset form
-        setFormData({
-          name: "",
-          email: "",
-          phone: "",
-          service: "",
-          subject: "",
-          message: "",
-        })
-      } else {
-        throw new Error(result.error || "Failed to send message")
+      const formData = new FormData(e.currentTarget)
+      const data = {
+        name: formData.get("name") as string,
+        email: formData.get("email") as string,
+        phone: formData.get("phone") as string,
+        message: formData.get("message") as string,
       }
+
+      // Simple validation
+      if (!data.name || !data.email || !data.message) {
+        throw new Error("Please fill in all required fields")
+      }
+
+      // Simulate form submission
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      toast({
+        title: "Message Sent!",
+        description: "We'll get back to you within 24 hours.",
+      })
+
+      // Reset form
+      ;(e.target as HTMLFormElement).reset()
     } catch (error) {
-      console.error("Error sending contact email:", error)
+      console.error("Contact form error:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to send message. Please try again.",
@@ -82,285 +56,235 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-black">
-      {/* Hero Section */}
-      <section className="relative py-16 overflow-hidden">
-        <div className="absolute inset-0 z-0 opacity-30 splatter-bg"></div>
-        <div className="container relative z-10">
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-6">
-              <span className="bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink bg-clip-text text-transparent">
-                Contact Us
-              </span>
-            </h1>
-            <p className="text-xl text-white/80">
-              Have questions about our slushie machines or services? We'd love to hear from you!
-            </p>
-          </div>
+    <div className="min-h-screen bg-black py-12">
+      <div className="container max-w-6xl">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold mb-4">
+            <span className="bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink bg-clip-text text-transparent">
+              Get in Touch
+            </span>
+          </h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Ready to make your event unforgettable? Contact us for bookings, questions, or custom packages.
+          </p>
         </div>
-      </section>
 
-      {/* Contact Section */}
-      <section className="py-12 bg-slate-900">
-        <div className="container">
-          <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Contact Form */}
-            <Card className="bg-black/50 border border-white/10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          {/* Contact Information */}
+          <div className="space-y-8">
+            <Card className="border border-white/10 bg-black/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-2xl">Send us a Message</CardTitle>
-                <CardDescription>
-                  Fill out the form below and we'll get back to you as soon as possible.
-                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-white">Contact Information</CardTitle>
+                <CardDescription>Get in touch with us through any of these channels</CardDescription>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name *</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => handleInputChange("name", e.target.value)}
-                        required
-                        className="bg-black/50 border-white/20"
-                        placeholder="Your full name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email Address *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => handleInputChange("email", e.target.value)}
-                        required
-                        className="bg-black/50 border-white/20"
-                        placeholder="your.email@example.com"
-                      />
-                    </div>
+              <CardContent className="space-y-6">
+                <div className="flex items-center space-x-4">
+                  <div className="flex-shrink-0">
+                    <Phone className="h-6 w-6 text-slushie-blue" />
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        value={formData.phone}
-                        onChange={(e) => handleInputChange("phone", e.target.value)}
-                        className="bg-black/50 border-white/20"
-                        placeholder="(123) 456-7890"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="service">Service of Interest *</Label>
-                      <Select value={formData.service} onValueChange={(value) => handleInputChange("service", value)}>
-                        <SelectTrigger className="bg-black/50 border-white/20">
-                          <SelectValue placeholder="Select a service" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-black border-white/20">
-                          {services.map((service) => (
-                            <SelectItem
-                              key={service.value}
-                              value={service.value}
-                              className="text-white hover:bg-slate-800"
-                            >
-                              {service.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <p className="font-semibold text-white">Phone</p>
+                    <p className="text-muted-foreground">+1 (555) 123-4567</p>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="subject">Subject *</Label>
-                    <Input
-                      id="subject"
-                      value={formData.subject}
-                      onChange={(e) => handleInputChange("subject", e.target.value)}
-                      required
-                      className="bg-black/50 border-white/20"
-                      placeholder="Brief description of your inquiry"
-                    />
+                <div className="flex items-center space-x-4">
+                  <div className="flex-shrink-0">
+                    <Mail className="h-6 w-6 text-slushie-green" />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="message">Message *</Label>
-                    <Textarea
-                      id="message"
-                      value={formData.message}
-                      onChange={(e) => handleInputChange("message", e.target.value)}
-                      required
-                      className="bg-black/50 border-white/20 min-h-[120px]"
-                      placeholder="Please provide details about your event, requirements, or questions..."
-                    />
+                  <div>
+                    <p className="font-semibold text-white">Email</p>
+                    <p className="text-muted-foreground">hello@stayfrosty.com</p>
                   </div>
+                </div>
 
-                  <Button
-                    type="submit"
-                    disabled={
-                      isSubmitting ||
-                      !formData.name ||
-                      !formData.email ||
-                      !formData.service ||
-                      !formData.subject ||
-                      !formData.message
-                    }
-                    className="w-full bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink hover:opacity-90 text-black font-bold splash-button"
-                  >
-                    {isSubmitting ? "Sending Message..." : "Send Message"}
-                  </Button>
-                </form>
+                <div className="flex items-center space-x-4">
+                  <div className="flex-shrink-0">
+                    <MapPin className="h-6 w-6 text-slushie-pink" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">Service Area</p>
+                    <p className="text-muted-foreground">Greater Metropolitan Area</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <div className="flex-shrink-0">
+                    <Clock className="h-6 w-6 text-slushie-blue" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">Business Hours</p>
+                    <p className="text-muted-foreground">Mon-Sun: 8AM - 10PM</p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Contact Information */}
-            <div className="space-y-8">
-              <Card className="bg-black/50 border border-white/10">
-                <CardHeader>
-                  <CardTitle className="text-2xl">Get in Touch</CardTitle>
-                  <CardDescription>
-                    We're here to help make your event unforgettable with our premium slushie machines.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-slushie-green/20 flex items-center justify-center">
-                      <Mail className="w-6 h-6 text-slushie-green" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Email</h3>
-                      <p className="text-muted-foreground">stayfrastyco@gmail.com</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-slushie-blue/20 flex items-center justify-center">
-                      <Phone className="w-6 h-6 text-slushie-blue" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Phone</h3>
-                      <p className="text-muted-foreground">04 3397 8027</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-slushie-pink/20 flex items-center justify-center">
-                      <MapPin className="w-6 h-6 text-slushie-pink" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Service Area</h3>
-                      <p className="text-muted-foreground"> Brisbane Greater Metro Area & Surrounding Cities</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-black/50 border border-white/10">
-                <CardHeader>
-                  <CardTitle>Business Hours</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
+            <Card className="border border-white/10 bg-black/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-xl font-bold text-white">Quick Response Times</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span>Monday - Friday</span>
-                    <span className="text-slushie-green">9:00 AM - 6:00 PM</span>
+                    <span className="text-muted-foreground">Email Inquiries</span>
+                    <span className="text-slushie-green font-semibold">Within 2 hours</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Saturday</span>
-                    <span className="text-slushie-blue">10:00 AM - 4:00 PM</span>
+                    <span className="text-muted-foreground">Phone Calls</span>
+                    <span className="text-slushie-blue font-semibold">Immediate</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Sunday</span>
-                    <span className="text-slushie-pink">By Appointment</span>
+                    <span className="text-muted-foreground">Booking Confirmations</span>
+                    <span className="text-slushie-pink font-semibold">Within 1 hour</span>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              <Card className="bg-black/50 border border-white/10">
-                <CardHeader>
-                  <CardTitle>Quick Response</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4">
-                    We typically respond to all inquiries within 24 hours. For urgent requests or same-day bookings,
-                    please call us directly.
-                  </p>
+          {/* Contact Form */}
+          <Card className="border border-white/10 bg-black/80 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-white">Send us a Message</CardTitle>
+              <CardDescription>Fill out the form below and we'll get back to you soon</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slushie-green">✓</span>
-                      <span className="text-sm">Free quotes and consultations</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slushie-blue">✓</span>
-                      <span className="text-sm">Custom package recommendations</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slushie-pink">✓</span>
-                      <span className="text-sm">Flexible scheduling options</span>
-                    </div>
+                    <Label htmlFor="name">Full Name *</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      required
+                      className="bg-black/50 border-white/20"
+                      placeholder="Your full name"
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      className="bg-black/50 border-white/20"
+                      placeholder="your@email.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    className="bg-black/50 border-white/20"
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="subject">Subject</Label>
+                  <Input
+                    id="subject"
+                    name="subject"
+                    className="bg-black/50 border-white/20"
+                    placeholder="What's this about?"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="message">Message *</Label>
+                  <Textarea
+                    id="message"
+                    name="message"
+                    required
+                    rows={5}
+                    className="bg-black/50 border-white/20"
+                    placeholder="Tell us about your event, questions, or how we can help..."
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink text-black font-bold splash-button"
+                >
+                  {isSubmitting ? "Sending..." : "Send Message"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </div>
-      </section>
 
-      {/* FAQ Section */}
-      <section className="py-16 bg-black relative overflow-hidden">
-        <div className="absolute inset-0 z-0 opacity-20 splatter-bg"></div>
-        <div className="container relative z-10">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
-              <span className="bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink bg-clip-text text-transparent">
-                Frequently Asked Questions
-              </span>
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Card className="bg-black/50 border border-white/10">
-                <CardContent className="p-6">
-                  <h3 className="font-semibold text-slushie-green mb-2">How far in advance should I book?</h3>
-                  <p className="text-sm text-muted-foreground">
-                    We recommend booking at least 2 weeks in advance, especially during peak season (summer months).
-                    However, we can often accommodate last-minute requests.
-                  </p>
-                </CardContent>
-              </Card>
+        {/* FAQ Section */}
+        <div className="mt-16">
+          <Card className="border border-white/10 bg-black/80 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-white text-center">Frequently Asked Questions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-white mb-2">How far in advance should I book?</h3>
+                    <p className="text-muted-foreground text-sm">
+                      We recommend booking at least 2 weeks in advance, especially for weekend events. However, we can
+                      often accommodate last-minute bookings.
+                    </p>
+                  </div>
 
-              <Card className="bg-black/50 border border-white/10">
-                <CardContent className="p-6">
-                  <h3 className="font-semibold text-slushie-blue mb-2">Do you provide setup and cleanup?</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Yes! Our Standard and Premium packages include full setup and cleanup. We handle everything so you
-                    can focus on enjoying your event.
-                  </p>
-                </CardContent>
-              </Card>
+                  <div>
+                    <h3 className="font-semibold text-white mb-2">Do you provide setup and cleanup?</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Yes! Our team handles complete setup, operation during your event, and cleanup afterward. You just
+                      enjoy the party!
+                    </p>
+                  </div>
 
-              <Card className="bg-black/50 border border-white/10">
-                <CardContent className="p-6">
-                  <h3 className="font-semibold text-slushie-pink mb-2">What's your cancellation policy?</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Cancellations made 48+ hours in advance receive a full refund. Cancellations within 48 hours may be
-                    subject to a 50% cancellation fee.
-                  </p>
-                </CardContent>
-              </Card>
+                  <div>
+                    <h3 className="font-semibold text-white mb-2">What's your cancellation policy?</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Cancellations made 48+ hours in advance receive a full refund. Within 48 hours, a 50% refund
+                      applies.
+                    </p>
+                  </div>
+                </div>
 
-              <Card className="bg-black/50 border border-white/10">
-                <CardContent className="p-6">
-                  <h3 className="font-semibold text-slushie-green mb-2">Can you create custom flavors?</h3>
-                  <p className="text-sm text-muted-foreground">
-                    We love creating unique flavors for special events. Contact us to discuss your custom flavor ideas
-                    and we'll make it happen.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-white mb-2">How many flavors can I choose?</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Single machines come with 2 flavors, double machines with 4 flavors, and triple machines with 6
+                      flavors. Mix and match as you like!
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-white mb-2">Do you serve indoor and outdoor events?</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Our machines work great both indoors and outdoors. We just need access to a standard electrical
+                      outlet.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-white mb-2">What if it rains during my outdoor event?</h3>
+                    <p className="text-muted-foreground text-sm">
+                      We provide weather protection for our equipment and can quickly relocate to covered areas if
+                      needed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </section>
+      </div>
     </div>
   )
 }

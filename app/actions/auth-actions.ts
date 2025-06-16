@@ -1,22 +1,56 @@
-"use server"
+import { createServerSupabaseClient } from "@/lib/supabase"
+import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 
-import { getBrowserClient } from "@/lib/supabase"
+export async function signUp(formData: FormData) {
+  "use server"
 
-export async function checkEmailExists(email: string) {
-  try {
-    const supabase = getBrowserClient()
+  const email = String(formData.get("email"))
+  const password = String(formData.get("password"))
 
-    // Check if email exists in auth.users table
-    const { data, error } = await supabase.rpc("check_email_exists", { email_to_check: email })
+  const supabase = createServerSupabaseClient({ cookies })
 
-    if (error) {
-      console.error("Error checking email:", error)
-      return { exists: false, error: error.message }
-    }
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    },
+  })
 
-    return { exists: data || false, error: null }
-  } catch (err) {
-    console.error("Unexpected error checking email:", err)
-    return { exists: false, error: "Failed to check email" }
+  if (error) {
+    return { message: error.message }
   }
+
+  return redirect("/auth/check-email")
+}
+
+export async function signIn(formData: FormData) {
+  "use server"
+
+  const email = String(formData.get("email"))
+  const password = String(formData.get("password"))
+
+  const supabase = createServerSupabaseClient({ cookies })
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (error) {
+    return { message: error.message }
+  }
+
+  return redirect("/")
+}
+
+export async function signOut() {
+  "use server"
+
+  const supabase = createServerSupabaseClient({ cookies })
+
+  await supabase.auth.signOut()
+
+  return redirect("/auth/sign-in")
 }

@@ -1,101 +1,29 @@
-"use server"
-
-import Stripe from "stripe"
-import { createServerClient } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase"
 import { revalidatePath } from "next/cache"
-import { paymentSchema, validate } from "@/lib/validators"
+import { redirect } from "next/navigation"
 
-// Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2023-10-16", // Use the latest API version
-})
+export async function addPaymentAction(formData: FormData) {
+  "use server"
 
-export async function createPaymentIntent(bookingId: string, amount: number) {
-  try {
-    // Validate input
-    const validation = await validate(paymentSchema, { bookingId, amount })
-    if (!validation.success) {
-      return { success: false, error: "Validation failed", validationErrors: validation.errors }
-    }
+  const supabase = createServerSupabaseClient()
 
-    // Fetch the booking to verify it exists and get details
-    const supabase = createServerClient()
-    const { data: booking, error: bookingError } = await supabase
-      .from("slushie_bookings")
-      .select("*")
-      .eq("id", bookingId)
-      .single()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-    if (bookingError || !booking) {
-      console.error("Error fetching booking:", bookingError)
-      return { success: false, error: "Booking not found" }
-    }
-
-    // Create a PaymentIntent with the booking amount
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Convert to cents
-      currency: "usd",
-      metadata: {
-        booking_id: bookingId,
-        user_id: booking.user_id || "guest",
-        machine_type: booking.machine_type,
-        package_type: booking.package_type,
-      },
-      automatic_payment_methods: {
-        enabled: true,
-      },
-    })
-
-    console.log("PaymentIntent created:", paymentIntent.id, "Client Secret:", paymentIntent.client_secret)
-
-    return {
-      success: true,
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
-    }
-  } catch (error) {
-    console.error("Error creating payment intent:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "An unexpected error occurred",
-    }
+  if (!user) {
+    return redirect("/login")
   }
-}
 
-export async function updateBookingPaymentStatus(bookingId: string, paymentIntentId: string, status: string) {
-  try {
-    if (!bookingId || !paymentIntentId || !status) {
-      return {
-        success: false,
-        error: "Missing required parameters: bookingId, paymentIntentId, and status are required",
-      }
-    }
+  const payment = formData.get("payment") as string
 
-    const supabase = createServerClient()
+  const { error } = await supabase.from("payments").insert({ payment, user_id: user.id })
 
-    const { error } = await supabase
-      .from("slushie_bookings")
-      .update({
-        payment_status: status,
-        payment_intent_id: paymentIntentId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", bookingId)
-
-    if (error) {
-      console.error("Error updating booking payment status:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/bookings")
-    revalidatePath("/profile")
-
-    return { success: true }
-  } catch (error) {
-    console.error("Error updating booking payment status:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "An unexpected error occurred",
-    }
+  if (error) {
+    console.log(error)
+    return
   }
+
+  revalidatePath("/")
+  redirect("/")
 }
