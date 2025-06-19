@@ -32,7 +32,7 @@ export default function GlobalError({
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Something went wrong</AlertTitle>
             <AlertDescription>
-              \{error.message || "An unexpected error occurred. Please try again later."\}
+              {error.message || "An unexpected error occurred. Please try again later."\}
             </AlertDescription>
           </Alert>
 
