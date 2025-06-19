@@ -23,7 +23,7 @@ export default function GlobalError({
     // Basic logging, no Supabase needed here.
     console.error("Global error:", error)
   }, [error])
-
+}
   return (
     <html>
       <body>
@@ -48,5 +48,3 @@ export default function GlobalError({
       </body>
     </html>
   )
-  
-}
