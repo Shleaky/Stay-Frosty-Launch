@@ -37,10 +37,10 @@ export default function GlobalError({
           </Alert>
 
           <div className="flex gap-4">
-            <Button onClick=\{() => reset()\} variant="default">
+            <Button onClick={() => reset()} variant="default">
               Try again
             </Button>
-            <Button onClick=\{() => router.push("/")\} variant="outline">
+            <Button onClick={() => router.push("/")} variant="outline">
               Go to homepage
             </Button>
           </div>
