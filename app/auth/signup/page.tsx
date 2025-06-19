@@ -91,7 +91,8 @@ export default function SignupPage() {
       const { exists, error: checkError } = await checkEmailExists(email)
 
       if (checkError) {
-        throw new Error("Failed to verify email. Please try again.")
+        console.error("Email check error:", checkError)
+        // Don't block signup if email check fails, just log it
       }
 
       if (exists) {
@@ -106,23 +107,42 @@ export default function SignupPage() {
       }
 
       const userData = {
-        full_name: fullName,
-        phone,
+        full_name: fullName.trim(),
+        phone: phone.trim(),
         receive_marketing: receiveMarketing,
       }
 
-      console.log("Calling signUp with:", { email, password, userData })
+      console.log("Calling signUp with:", { email, userData })
 
       const { data, error: signUpError } = await signUp(email, password, userData)
 
       if (signUpError) {
         console.error("SignUp error:", signUpError)
-        setError(signUpError.message)
-        toast({
-          title: "Error",
-          description: signUpError.message,
-          variant: "destructive",
-        })
+
+        // Handle specific error types
+        if (signUpError.message.includes("Database error saving new user")) {
+          setError("There was a database issue creating your account. Please try again in a few minutes.")
+          toast({
+            title: "Database Error",
+            description: "We're experiencing technical difficulties. Please try again later or contact support.",
+            variant: "destructive",
+          })
+        } else if (signUpError.message.includes("already registered")) {
+          setEmailExists(true)
+          setError("This email address is already registered.")
+          toast({
+            title: "Email Already Registered",
+            description: "Please log in with this email or use a different email address.",
+            variant: "destructive",
+          })
+        } else {
+          setError(signUpError.message)
+          toast({
+            title: "Signup Error",
+            description: signUpError.message,
+            variant: "destructive",
+          })
+        }
       } else {
         console.log("SignUp successful:", data)
         toast({

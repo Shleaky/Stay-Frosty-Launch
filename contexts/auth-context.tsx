@@ -15,6 +15,7 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<any>
   signOut: () => Promise<any>
   refreshSession: () => Promise<void>
+  resendConfirmation: (email: string) => Promise<any>
 }
 
 const defaultAuthContext: AuthContextType = {
@@ -26,6 +27,7 @@ const defaultAuthContext: AuthContextType = {
   signIn: async () => ({ data: null, error: new Error("Auth context not initialized") }),
   signOut: async () => ({ error: new Error("Auth context not initialized") }),
   refreshSession: async () => {},
+  resendConfirmation: async () => ({ data: null, error: new Error("Auth context not initialized") }),
 }
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContext)
@@ -163,17 +165,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!supabaseClient) throw new Error("Supabase client not available")
 
+      // First, let's try a simpler signup without metadata to isolate the issue
       const { data, error } = await supabaseClient.auth.signUp({
         email,
         password,
         options: {
-          data: metadata,
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          // Try without metadata first to see if that's causing the issue
+          data: {
+            full_name: metadata.full_name || "",
+            phone: metadata.phone || "",
+            receive_marketing: metadata.receive_marketing || false,
+          },
         },
       })
 
       if (error) {
-        console.error("Signup error:", error)
+        console.error("Signup error details:", {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+        })
+
+        // Handle specific database errors
+        if (error.message.includes("Database error saving new user")) {
+          return {
+            data: null,
+            error: {
+              ...error,
+              message:
+                "There was an issue creating your account. This might be due to database configuration. Please try again or contact support if the problem persists.",
+            },
+          }
+        }
 
         if (error.message.includes("User already registered")) {
           return {
@@ -184,12 +208,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             },
           }
         }
+
+        // Handle rate limiting
+        if (error.message.includes("rate limit")) {
+          return {
+            data: null,
+            error: {
+              ...error,
+              message: "Too many signup attempts. Please wait a few minutes before trying again.",
+            },
+          }
+        }
       }
 
       return { data, error }
     } catch (err) {
       console.error("Unexpected signup error:", err)
-      return { data: null, error: err instanceof Error ? err : new Error(String(err)) }
+      return {
+        data: null,
+        error: {
+          message: "An unexpected error occurred during signup. Please try again.",
+          originalError: err instanceof Error ? err.message : String(err),
+        },
+      }
     }
   }
 
@@ -206,6 +247,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Sign in error:", error)
+
+        // Handle email not confirmed error specifically
+        if (error.message.includes("Email not confirmed")) {
+          return {
+            data: null,
+            error: {
+              ...error,
+              message:
+                "Please check your email and click the confirmation link before signing in. You can request a new confirmation email below.",
+              needsConfirmation: true,
+              email: email,
+            },
+          }
+        }
       } else {
         console.log("Sign in successful")
       }
@@ -271,8 +326,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const resendConfirmation = async (email: string) => {
+    try {
+      console.log("Resending confirmation email to:", email)
+
+      if (!supabaseClient) throw new Error("Supabase client not available")
+
+      const { data, error } = await supabaseClient.auth.resend({
+        type: "signup",
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+
+      if (error) {
+        console.error("Resend confirmation error:", error)
+      } else {
+        console.log("Confirmation email resent successfully")
+      }
+
+      return { data, error }
+    } catch (err) {
+      console.error("Unexpected resend confirmation error:", err)
+      return { data: null, error: err instanceof Error ? err : new Error(String(err)) }
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, error, signUp, signIn, signOut, refreshSession }}>
+    <AuthContext.Provider
+      value={{ user, session, isLoading, error, signUp, signIn, signOut, refreshSession, resendConfirmation }}
+    >
       {children}
     </AuthContext.Provider>
   )

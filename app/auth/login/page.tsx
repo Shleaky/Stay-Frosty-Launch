@@ -12,12 +12,12 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { Info } from "lucide-react"
+import { Info, Mail } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, signIn, isLoading: authLoading } = useAuth()
+  const { user, signIn, isLoading: authLoading, resendConfirmation } = useAuth()
   const { toast } = useToast()
 
   const [email, setEmail] = useState("")
@@ -25,6 +25,9 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasRedirected, setHasRedirected] = useState(false)
+  const [needsConfirmation, setNeedsConfirmation] = useState(false)
+  const [confirmationEmail, setConfirmationEmail] = useState("")
+  const [isResending, setIsResending] = useState(false)
 
   // Get message and next from URL params
   const message = searchParams.get("message")
@@ -63,6 +66,7 @@ export default function LoginPage() {
 
     setIsLoading(true)
     setError(null)
+    setNeedsConfirmation(false)
 
     try {
       console.log("Attempting login...")
@@ -71,6 +75,13 @@ export default function LoginPage() {
       if (error) {
         console.error("Login error:", error)
         setError(error.message)
+
+        // Check if this is an email confirmation error
+        if (error.needsConfirmation) {
+          setNeedsConfirmation(true)
+          setConfirmationEmail(error.email || email)
+        }
+
         toast({
           title: "Login Failed",
           description: error.message,
@@ -99,6 +110,36 @@ export default function LoginPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleResendConfirmation = async () => {
+    setIsResending(true)
+
+    try {
+      const { error } = await resendConfirmation(confirmationEmail)
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Confirmation Email Sent",
+          description: "Please check your email for the confirmation link.",
+        })
+        setNeedsConfirmation(false)
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to resend confirmation email",
+        variant: "destructive",
+      })
+    } finally {
+      setIsResending(false)
     }
   }
 
@@ -176,6 +217,29 @@ export default function LoginPage() {
               </div>
 
               {error && <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-500">{error}</div>}
+
+              {needsConfirmation && (
+                <div className="rounded-md bg-yellow-500/20 p-3 text-sm text-yellow-600 border border-yellow-500/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Mail className="h-4 w-4" />
+                    <span className="font-medium">Email Confirmation Required</span>
+                  </div>
+                  <p className="mb-3">
+                    Your email address needs to be confirmed before you can sign in. Please check your email for the
+                    confirmation link.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResendConfirmation}
+                    disabled={isResending}
+                    className="bg-yellow-500/10 border-yellow-500/30 text-yellow-600 hover:bg-yellow-500/20"
+                  >
+                    {isResending ? "Sending..." : "Resend Confirmation Email"}
+                  </Button>
+                </div>
+              )}
             </CardContent>
 
             <CardFooter className="flex flex-col space-y-4">
