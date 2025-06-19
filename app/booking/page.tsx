@@ -276,6 +276,12 @@ export default function BookingPage() {
         throw new Error(paymentResult.error || "Failed to create payment intent")
       }
 
+      if (!paymentResult.clientSecret) {
+        throw new Error("Payment client secret not received")
+      }
+
+      setPaymentClientSecret(paymentResult.clientSecret)
+
       setIsConfirmDialogOpen(false)
       setIsBookingComplete(true)
       setBookingReference(`SF-${Math.floor(Math.random() * 10000)}-${Math.floor(Math.random() * 10000)}`)
