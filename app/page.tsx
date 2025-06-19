@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Snowflake, Users, Calendar, Star, Phone, Mail, MapPin } from "lucide-react"
+import Image from "next/image"
 
 export default function HomePage() {
   const router = useRouter()
@@ -34,62 +34,41 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-black">
       {/* Hero Section */}
-      <section className="relative overflow-hidden py-20 lg:py-32">
-        <div className="absolute inset-0 z-0 opacity-20 splatter-bg"></div>
-        <div className="container relative z-10 mx-auto px-4">
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-20 items-center">
-            <div className="space-y-8">
-              <div className="space-y-4">
-                <Badge variant="outline" className="border-slushie-green text-slushie-green">
-                  <Snowflake className="mr-2 h-4 w-4" />
-                  Premium Slushie Rentals
-                </Badge>
-                <h1 className="text-4xl font-bold tracking-tight lg:text-6xl">
-                  <span className="bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink bg-clip-text text-transparent">
-                    STAY
-                  </span>
-                  <br />
-                  <span className="bg-gradient-to-r from-slushie-blue via-slushie-pink to-slushie-green bg-clip-text text-transparent">
-                    FROSTY
-                  </span>
-                  <br />
-                  <span className="bg-gradient-to-r from-slushie-pink via-slushie-green to-slushie-blue bg-clip-text text-transparent">
-                    SLUSHIES
-                  </span>
-                </h1>
-                <p className="text-xl text-muted-foreground lg:text-2xl">
-                  Premium slushie machines for hire - perfect for parties, events, and making your next gathering
-                  unforgettable!
-                </p>
-              </div>
-              <div className="flex flex-col gap-4 sm:flex-row">
+      <section className="relative py-20 overflow-hidden">
+        <div className="absolute inset-0 z-0 opacity-30 splatter-bg"></div>
+        <div className="container relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <div className="flex flex-col gap-6">
+              <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">
+                <span className="block text-slushie-green glow-text">STAY</span>
+                <span className="block text-slushie-blue glow-text">FROSTY</span>
+                <span className="block text-slushie-pink glow-text">SLUSHIES</span>
+              </h1>
+              <p className="text-xl text-white/80">
+                Premium slushie machines for hire - perfect for parties, events, and making your next gathering
+                unforgettable!
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
                 <Button
                   asChild
-                  size="lg"
-                  className="bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink text-black font-bold splash-button"
+                  className="bg-slushie-green hover:bg-slushie-green/80 text-black font-bold splash-button"
                 >
                   <Link href="/services">Our Services</Link>
                 </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="lg"
-                  className="border-slushie-blue text-slushie-blue hover:bg-slushie-blue hover:text-black"
-                >
+                <Button asChild className="bg-slushie-pink hover:bg-slushie-pink/80 text-white font-bold splash-button">
                   <Link href="/booking">Book Now</Link>
                 </Button>
               </div>
             </div>
             <div className="relative">
-              <div className="aspect-square overflow-hidden rounded-3xl bg-gradient-to-br from-slushie-green/20 via-slushie-blue/20 to-slushie-pink/20 p-8">
-                <img
-                  src="/images/stay-frosty-hero-new.jpg"
-                  alt="Colorful slushie machine with vibrant Stay Frosty branding"
-                  className="h-full w-full object-cover rounded-2xl"
-                />
-              </div>
-              <div className="absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-slushie-pink blur-xl opacity-60"></div>
-              <div className="absolute -top-6 -left-6 h-32 w-32 rounded-full bg-slushie-blue blur-xl opacity-40"></div>
+              <div className="absolute -inset-4 bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink rounded-full blur-xl opacity-30 animate-pulse"></div>
+              <Image
+                src="/images/stay-frosty-hero-new.jpg"
+                alt="Stay Frosty Slushies - Vibrant street art style logo with overflowing slushie cup"
+                width={600}
+                height={600}
+                className="relative z-10 animate-float object-cover rounded-lg"
+              />
             </div>
           </div>
         </div>
