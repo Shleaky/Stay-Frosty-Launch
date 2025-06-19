@@ -1,10 +1,14 @@
 "use client"
 
+// IMPORTANT: This file MUST NOT import anything from '@v0/lib/supabase'
+// or any other Supabase client directly. It's a global error boundary
+// and should have minimal dependencies.
+
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { AlertCircle } from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
+import { AlertCircle } from "lucide-react" // Standard icon library
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert" // Standard UI component
+import { Button } from "@/components/ui/button" // Standard UI component
 
 export default function GlobalError({
   error,
@@ -16,7 +20,7 @@ export default function GlobalError({
   const router = useRouter()
 
   useEffect(() => {
-    // Log the error to an error reporting service
+    // Basic logging, no Supabase needed here.
     console.error("Global error:", error)
   }, [error])
 
