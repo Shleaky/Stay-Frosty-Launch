@@ -1,50 +1,48 @@
-import { createClient } from "@supabase/supabase-js"
+import { createBrowserClient as _createBrowserClient, createServerClient as _createServerClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-// Global singleton - only ONE instance ever
-let supabaseInstance: SupabaseClient | null = null
+// --- Client-Side Supabase Client (Singleton) ---
+let browserClientInstance: SupabaseClient | null = null
 
-// Create client only once, ever
-export const getSupabaseClient = (): SupabaseClient => {
-  if (supabaseInstance) {
-    return supabaseInstance
+export function getBrowserClient(): SupabaseClient {
+  if (typeof window === "undefined") {
+    // This function should only be called on the client.
+    // For server-side, use createServerClient from this file or directly from @supabase/ssr.
+    throw new Error("getBrowserClient() should only be called on the client side.")
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+  if (!browserClientInstance) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Missing Supabase URL or Anon Key for browser client.")
+    }
+    console.log("Creating new Supabase browser client instance.")
+    browserClientInstance = _createBrowserClient(supabaseUrl, supabaseAnonKey)
   }
-
-  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      flowType: "pkce",
-    },
-  })
-
-  return supabaseInstance
+  return browserClientInstance
 }
 
-// Legacy exports for compatibility
-export const getBrowserClient = getSupabaseClient
+// --- Server-Side Supabase Client (for Route Handlers, Server Actions, Server Components) ---
+// This version uses the service role key for elevated privileges when needed.
+// For operations that should respect RLS based on user session, use the middleware client pattern.
+export function createServiceRoleClient(): SupabaseClient {
+  const supabaseUrl = process.env.SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-// Server-side client with service role for admin operations
-export const createServerClient = () => {
-  const supabaseUrl = process.env.SUPABASE_URL as string
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase server environment variables")
+  if (typeof window !== "undefined") {
+    throw new Error("createServiceRoleClient() should only be called on the server side.")
   }
 
-  return createClient(supabaseUrl, supabaseServiceKey, {
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase URL or Service Role Key for service client.")
+  }
+  return _createServerClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
+    // No cookies needed for service role client as it doesn't operate on behalf of a user
   })
 }

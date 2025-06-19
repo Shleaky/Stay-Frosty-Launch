@@ -3,12 +3,21 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { format, parseISO, isPast, isFuture, isValid } from "date-fns"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { getUserSlushieBookings, cancelSlushieBooking } from "@/app/actions/booking-actions"
-import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
 // Helper function to safely parse and validate dates
 const safeParseDate = (dateString: string | null | undefined): Date | null => {
@@ -63,8 +72,8 @@ const safeIsPast = (dateString: string | null | undefined): boolean => {
 }
 
 export default function BookingsPage() {
-  const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
+  const { user, isLoading: authLoading } = useAuth()
   const { toast } = useToast()
 
   const [bookings, setBookings] = useState<any[]>([])
@@ -182,49 +191,339 @@ export default function BookingsPage() {
 
   const pastBookings = bookings.filter((booking) => safeIsPast(booking.booking_date) || booking.status === "cancelled")
 
-  if (authLoading) {
+  if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <Skeleton className="h-8 w-48 mb-8" />
-          <div className="grid gap-6">
-            {[1, 2, 3].map((i) => (
-              <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-6 w-32" />
-                  <Skeleton className="h-4 w-64" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-4 w-full mb-2" />
-                  <Skeleton className="h-4 w-3/4" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-slushie-blue"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Loading bookings...</p>
         </div>
       </div>
     )
   }
 
-  if (!user) {
-    return null // Will redirect via useEffect
-  }
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">My Bookings</h1>
+    <div className="flex flex-col min-h-screen bg-black">
+      {/* Hero Section */}
+      <section className="relative py-16 overflow-hidden">
+        <div className="absolute inset-0 z-0 opacity-30 splatter-bg"></div>
+        <div className="container relative z-10">
+          <div className="max-w-3xl mx-auto text-center">
+            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-6">
+              <span className="bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink bg-clip-text text-transparent">
+                Your Bookings
+              </span>
+            </h1>
+            <p className="text-xl text-white/80">Manage your slushie machine bookings</p>
+          </div>
+        </div>
+      </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Bookings</CardTitle>
-            <CardDescription>View and manage your slushie machine bookings</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-500">No bookings found. Ready to book your first slushie machine?</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Bookings Section */}
+      <section className="py-12 bg-slate-900">
+        <div className="container">
+          <div className="max-w-5xl mx-auto">
+            {error ? (
+              <Card className="bg-black/50 border border-white/10">
+                <CardContent className="p-6 text-center">
+                  <p className="text-red-500 mb-4">{error}</p>
+                  <Button
+                    onClick={() => window.location.reload()}
+                    className="bg-slushie-blue hover:bg-slushie-blue/80 text-white font-bold"
+                  >
+                    Try Again
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : bookings.length === 0 ? (
+              <Card className="bg-black/50 border border-white/10">
+                <CardContent className="p-6 text-center">
+                  <p className="text-muted-foreground mb-4">You don't have any bookings yet.</p>
+                  <Button
+                    asChild
+                    className="bg-slushie-green hover:bg-slushie-green/80 text-black font-bold splash-button"
+                  >
+                    <a href="/booking">Book a Slushie Machine</a>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Tabs defaultValue="upcoming" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-8">
+                  <TabsTrigger value="upcoming" className="text-lg">
+                    Upcoming Bookings
+                  </TabsTrigger>
+                  <TabsTrigger value="past" className="text-lg">
+                    Past Bookings
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="upcoming" className="space-y-6">
+                  {upcomingBookings.length === 0 ? (
+                    <Card className="bg-black/50 border border-white/10">
+                      <CardContent className="p-6 text-center">
+                        <p className="text-muted-foreground mb-4">You don't have any upcoming bookings.</p>
+                        <Button
+                          asChild
+                          className="bg-slushie-green hover:bg-slushie-green/80 text-black font-bold splash-button"
+                        >
+                          <a href="/booking">Book a Slushie Machine</a>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    upcomingBookings.map((booking) => (
+                      <Card key={booking.id} className="bg-black/50 border border-white/10 overflow-hidden">
+                        <div className="h-2 bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink w-full"></div>
+                        <CardHeader className="flex flex-row items-start justify-between">
+                          <div>
+                            <CardTitle>Booking for {safeFormatDate(booking.booking_date)}</CardTitle>
+                            <CardDescription>Reference: {booking.id.substring(0, 8).toUpperCase()}</CardDescription>
+                          </div>
+                          {getStatusBadge(booking.status)}
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <h3 className="font-semibold mb-2">Booking Details</h3>
+                              <ul className="space-y-1 text-sm">
+                                <li>
+                                  <span className="text-muted-foreground">Date:</span>{" "}
+                                  {safeFormatDate(booking.booking_date, "EEEE, MMMM d, yyyy")}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Machine:</span>{" "}
+                                  {booking.machine_type === "single"
+                                    ? "Single Machine"
+                                    : booking.machine_type === "double"
+                                      ? "Double Machine"
+                                      : "Triple Machine"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Package:</span>{" "}
+                                  {booking.package_type === "basic"
+                                    ? "Basic Package"
+                                    : booking.package_type === "standard"
+                                      ? "Standard Package"
+                                      : "Premium Package"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Flavors:</span>{" "}
+                                  {Array.isArray(booking.flavors) ? booking.flavors.join(", ") : "No flavors selected"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Event Type:</span>{" "}
+                                  {booking.event_type || "Not specified"}
+                                </li>
+                              </ul>
+                            </div>
+                            <div>
+                              <h3 className="font-semibold mb-2">Contact Information</h3>
+                              <ul className="space-y-1 text-sm">
+                                <li>
+                                  <span className="text-muted-foreground">Name:</span>{" "}
+                                  {booking.user_name || "Not provided"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Email:</span>{" "}
+                                  {booking.user_email || "Not provided"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Phone:</span>{" "}
+                                  {booking.user_phone || "Not provided"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Total:</span> ${booking.total_price || 0}
+                                </li>
+                              </ul>
+                            </div>
+                          </div>
+                          {booking.comments && (
+                            <div className="mt-4">
+                              <h3 className="font-semibold mb-2">Additional Comments</h3>
+                              <p className="text-sm">{booking.comments}</p>
+                            </div>
+                          )}
+                        </CardContent>
+                        <CardFooter>
+                          {booking.status !== "cancelled" && (
+                            <Button
+                              variant="destructive"
+                              onClick={() => {
+                                setSelectedBooking(booking)
+                                setIsCancelDialogOpen(true)
+                              }}
+                            >
+                              Cancel Booking
+                            </Button>
+                          )}
+                        </CardFooter>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+
+                <TabsContent value="past" className="space-y-6">
+                  {pastBookings.length === 0 ? (
+                    <Card className="bg-black/50 border border-white/10">
+                      <CardContent className="p-6 text-center">
+                        <p className="text-muted-foreground">You don't have any past bookings.</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    pastBookings.map((booking) => (
+                      <Card key={booking.id} className="bg-black/50 border border-white/10 overflow-hidden">
+                        <div className="h-2 bg-gradient-to-r from-slate-400 to-slate-600 w-full"></div>
+                        <CardHeader className="flex flex-row items-start justify-between">
+                          <div>
+                            <CardTitle>Booking for {safeFormatDate(booking.booking_date)}</CardTitle>
+                            <CardDescription>Reference: {booking.id.substring(0, 8).toUpperCase()}</CardDescription>
+                          </div>
+                          {getStatusBadge(booking.status)}
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <h3 className="font-semibold mb-2">Booking Details</h3>
+                              <ul className="space-y-1 text-sm">
+                                <li>
+                                  <span className="text-muted-foreground">Date:</span>{" "}
+                                  {safeFormatDate(booking.booking_date, "EEEE, MMMM d, yyyy")}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Machine:</span>{" "}
+                                  {booking.machine_type === "single"
+                                    ? "Single Machine"
+                                    : booking.machine_type === "double"
+                                      ? "Double Machine"
+                                      : "Triple Machine"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Package:</span>{" "}
+                                  {booking.package_type === "basic"
+                                    ? "Basic Package"
+                                    : booking.package_type === "standard"
+                                      ? "Standard Package"
+                                      : "Premium Package"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Flavors:</span>{" "}
+                                  {Array.isArray(booking.flavors) ? booking.flavors.join(", ") : "No flavors selected"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Event Type:</span>{" "}
+                                  {booking.event_type || "Not specified"}
+                                </li>
+                              </ul>
+                            </div>
+                            <div>
+                              <h3 className="font-semibold mb-2">Contact Information</h3>
+                              <ul className="space-y-1 text-sm">
+                                <li>
+                                  <span className="text-muted-foreground">Name:</span>{" "}
+                                  {booking.user_name || "Not provided"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Email:</span>{" "}
+                                  {booking.user_email || "Not provided"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Phone:</span>{" "}
+                                  {booking.user_phone || "Not provided"}
+                                </li>
+                                <li>
+                                  <span className="text-muted-foreground">Total:</span> ${booking.total_price || 0}
+                                </li>
+                              </ul>
+                            </div>
+                          </div>
+                          {booking.comments && (
+                            <div className="mt-4">
+                              <h3 className="font-semibold mb-2">Additional Comments</h3>
+                              <p className="text-sm">{booking.comments}</p>
+                            </div>
+                          )}
+                        </CardContent>
+                        <CardFooter>
+                          {booking.status === "completed" && (
+                            <Button
+                              className="bg-slushie-green hover:bg-slushie-green/80 text-black font-bold"
+                              onClick={() => router.push("/booking")}
+                            >
+                              Book Again
+                            </Button>
+                          )}
+                        </CardFooter>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+              </Tabs>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Cancel Booking Dialog */}
+      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <DialogContent className="bg-black border border-white/10">
+          <DialogHeader>
+            <DialogTitle>Cancel Booking</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this booking? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedBooking && (
+              <div className="bg-black/30 p-4 rounded-lg">
+                <h3 className="font-semibold mb-2">Booking Details</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>Date:</div>
+                  <div>{safeFormatDate(selectedBooking.booking_date, "EEEE, MMMM do, yyyy")}</div>
+
+                  <div>Machine:</div>
+                  <div>
+                    {selectedBooking.machine_type === "single"
+                      ? "Single Machine"
+                      : selectedBooking.machine_type === "double"
+                        ? "Double Machine"
+                        : "Triple Machine"}
+                  </div>
+
+                  <div>Package:</div>
+                  <div>
+                    {selectedBooking.package_type === "basic"
+                      ? "Basic Package"
+                      : selectedBooking.package_type === "standard"
+                        ? "Standard Package"
+                        : "Premium Package"}
+                  </div>
+
+                  <div>Total:</div>
+                  <div className="font-bold">${selectedBooking.total_price || 0}</div>
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground">
+              Please note that cancellations made less than 48 hours before the booking date may be subject to a
+              cancellation fee.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCancelDialogOpen(false)} disabled={isCancelling}>
+              Keep Booking
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancelBooking}
+              disabled={isCancelling}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {isCancelling ? "Cancelling..." : "Cancel Booking"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

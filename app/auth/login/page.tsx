@@ -1,155 +1,216 @@
 "use client"
 
 import type React from "react"
-
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import Link from "next/link"
+import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
+import { Info, Mail } from "lucide-react"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showResendConfirmation, setShowResendConfirmation] = useState(false)
-  const [resendEmail, setResendEmail] = useState("")
-
-  const { signIn, user, isLoading, resendConfirmation } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user, signIn, isLoading: authLoading, resendConfirmation } = useAuth()
+  const { toast } = useToast()
+
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false) // Renamed from isLoading to avoid conflict
+  const [formError, setFormError] = useState<string | null>(null) // Renamed from error
+  const [needsConfirmation, setNeedsConfirmation] = useState(false)
+  const [confirmationEmail, setConfirmationEmail] = useState("")
+  const [isResending, setIsResending] = useState(false)
+
+  const nextRedirectUrl = searchParams.get("next") || "/profile"
+  const message = searchParams.get("message")
 
   useEffect(() => {
-    if (!isLoading && user) {
-      const nextUrl = searchParams.get("next")
-      if (nextUrl && nextUrl.startsWith("/")) {
-        router.replace(nextUrl)
-      } else {
-        router.replace("/profile")
-      }
+    // Middleware should handle redirecting authenticated users away from login.
+    // This client-side check is a fallback or for scenarios where middleware might not run (e.g. static export).
+    if (!authLoading && user) {
+      console.log("LoginPage: User already authenticated, redirecting to", nextRedirectUrl)
+      router.replace(nextRedirectUrl)
     }
-  }, [user, isLoading, router, searchParams])
+  }, [user, authLoading, router, nextRedirectUrl])
 
-  if (isLoading) {
+  useEffect(() => {
+    if (message === "signed_out") {
+      toast({ title: "Signed out successfully" })
+    } else if (message === "confirmation_pending") {
+      toast({ title: "Confirmation Pending", description: "Please check your email to confirm your account." })
+    }
+  }, [message, toast])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (isSubmitting) return
+
+    setIsSubmitting(true)
+    setFormError(null)
+    setNeedsConfirmation(false)
+
+    try {
+      const { data, error: signInError } = await signIn(email, password)
+
+      if (signInError) {
+        console.error("Login error:", signInError)
+        setFormError(signInError.message)
+        // @ts-ignore - checking for custom property
+        if (signInError.needsConfirmation) {
+          setNeedsConfirmation(true)
+          // @ts-ignore
+          setConfirmationEmail(signInError.email || email)
+        }
+        toast({ title: "Login Failed", description: signInError.message, variant: "destructive" })
+      } else if (data?.user) {
+        console.log("Login successful, user:", data.user.email)
+        toast({ title: "Login Successful!", description: "Redirecting..." })
+        // Redirect is handled by middleware or useEffect above after user state updates
+        // router.replace(nextRedirectUrl); // Avoid direct redirect here, let useEffect handle it
+      }
+    } catch (err) {
+      console.error("Unexpected login error:", err)
+      const unexpectedErrorMsg = "An unexpected error occurred during login."
+      setFormError(unexpectedErrorMsg)
+      toast({ title: "Error", description: unexpectedErrorMsg, variant: "destructive" })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleResendConfirmation = async () => {
+    if (!confirmationEmail) {
+      toast({ title: "Error", description: "Email for confirmation not found.", variant: "destructive" })
+      return
+    }
+    setIsResending(true)
+    try {
+      const { error: resendError } = await resendConfirmation(confirmationEmail)
+      if (resendError) {
+        toast({ title: "Error", description: resendError.message, variant: "destructive" })
+      } else {
+        toast({ title: "Confirmation Email Sent", description: "Please check your email." })
+        setNeedsConfirmation(false)
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to resend confirmation email.", variant: "destructive" })
+    } finally {
+      setIsResending(false)
+    }
+  }
+
+  if (authLoading && !user) {
+    // Show loading only if not yet authenticated
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-slushie-blue"></div>
       </div>
     )
   }
 
-  if (user) {
-    return null // Will redirect via useEffect
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setError(null)
-    setShowResendConfirmation(false)
-
-    const { data, error } = await signIn(email, password)
-
-    if (error) {
-      setError(error.message)
-      if (error.needsConfirmation) {
-        setShowResendConfirmation(true)
-        setResendEmail(error.email || email)
-      }
-    }
-
-    setIsSubmitting(false)
-  }
-
-  const handleResendConfirmation = async () => {
-    const { error } = await resendConfirmation(resendEmail)
-    if (error) {
-      setError(error.message)
-    } else {
-      setError(null)
-      alert("Confirmation email sent! Please check your inbox.")
-    }
-  }
+  // If user becomes available while on this page, useEffect will redirect.
+  // Avoid rendering the form if user is already set.
+  if (user) return null
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Sign in to your account</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Or{" "}
-            <Link href="/auth/signup" className="font-medium text-blue-600 hover:text-blue-500">
-              create a new account
-            </Link>
-          </p>
-        </div>
-
-        <Card>
+    <div className="flex min-h-screen items-center justify-center bg-black py-12">
+      <div className="relative w-full max-w-md px-4">
+        <div className="absolute inset-0 z-0 opacity-30 splatter-bg"></div>
+        <Card className="relative z-10 border border-white/10 bg-black/80 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Welcome back</CardTitle>
-            <CardDescription>Enter your credentials to access your account</CardDescription>
+            <CardTitle className="text-2xl font-bold text-center">
+              <span className="bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink bg-clip-text text-transparent">
+                Log In
+              </span>
+            </CardTitle>
+            <CardDescription className="text-center">Enter your credentials to access your account</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email address</Label>
+
+          {searchParams.get("next") && ( // Check original 'next' from URL, not the stateful one
+            <div className="px-6 pb-4">
+              <Alert className="border-slushie-blue/50 bg-slushie-blue/10">
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-slushie-blue">Please log in to continue.</AlertDescription>
+              </Alert>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
-                  name="email"
                   type="email"
-                  autoComplete="email"
-                  required
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1"
+                  required
+                  className="bg-black/50 border-white/20"
+                  disabled={isSubmitting}
                 />
               </div>
-
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
-                  name="password"
                   type="password"
-                  autoComplete="current-password"
-                  required
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1"
+                  required
+                  className="bg-black/50 border-white/20"
+                  disabled={isSubmitting}
                 />
               </div>
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
+              {formError && <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-500">{formError}</div>}
+              {needsConfirmation && (
+                <div className="rounded-md bg-yellow-500/20 p-3 text-sm text-yellow-600 border border-yellow-500/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Mail className="h-4 w-4" />
+                    <span className="font-medium">Email Confirmation Required</span>
+                  </div>
+                  <p className="mb-3">
+                    Your email address needs to be confirmed. Please check your email for the confirmation link.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResendConfirmation}
+                    disabled={isResending}
+                    className="bg-yellow-500/10 border-yellow-500/30 text-yellow-600 hover:bg-yellow-500/20"
+                  >
+                    {isResending ? "Sending..." : "Resend Confirmation Email"}
+                  </Button>
+                </div>
               )}
-
-              {showResendConfirmation && (
-                <Alert>
-                  <AlertDescription>
-                    Need a new confirmation email?{" "}
-                    <button
-                      type="button"
-                      onClick={handleResendConfirmation}
-                      className="font-medium text-blue-600 hover:text-blue-500 underline"
-                    >
-                      Click here to resend
-                    </button>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Signing in..." : "Sign in"}
+            </CardContent>
+            <CardFooter className="flex flex-col space-y-4">
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-slushie-green via-slushie-blue to-slushie-pink text-black font-bold splash-button"
+                disabled={isSubmitting || authLoading}
+              >
+                {isSubmitting ? "Logging in..." : "Log In"}
               </Button>
-            </form>
-          </CardContent>
+              <div className="text-center text-sm">
+                Don't have an account?{" "}
+                <Link
+                  href={`/auth/signup${searchParams.get("next") ? `?next=${encodeURIComponent(searchParams.get("next")!)}` : ""}`}
+                  className="text-slushie-green hover:underline"
+                >
+                  Sign up
+                </Link>
+              </div>
+            </CardFooter>
+          </form>
         </Card>
       </div>
     </div>
