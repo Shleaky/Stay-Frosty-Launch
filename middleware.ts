@@ -4,19 +4,6 @@ import type { NextRequest } from "next/server"
 export async function middleware(request: NextRequest) {
   try {
     const response = NextResponse.next()
-
-    // Get Supabase session cookies - these are the actual cookie names Supabase uses
-    const supabaseAuthToken = request.cookies.get("sb-kzmfwad4p84q2npcqdet-auth-token")?.value
-    const supabaseAuthTokenLegacy = request.cookies.get("supabase-auth-token")?.value
-
-    // Check for any Supabase auth cookies (they can have different patterns)
-    const authCookies = request.cookies
-      .getAll()
-      .filter(
-        (cookie) =>
-          cookie.name.includes("supabase") || cookie.name.includes("sb-") || cookie.name.includes("auth-token"),
-      )
-
     const { pathname } = request.nextUrl
 
     // Protected routes that require authentication
@@ -27,40 +14,51 @@ export async function middleware(request: NextRequest) {
     const authPaths = ["/auth/login", "/auth/signup"]
     const isAuthPath = authPaths.some((path) => pathname.startsWith(path))
 
-    // More lenient session detection
-    const hasSession = !!(supabaseAuthToken || supabaseAuthTokenLegacy || authCookies.length > 0)
+    // Get all cookies and look for any Supabase-related ones
+    const allCookies = request.cookies.getAll()
+    const authCookies = allCookies.filter((cookie) => {
+      const name = cookie.name.toLowerCase()
+      return (
+        name.includes("supabase") ||
+        name.includes("sb-") ||
+        name.includes("auth") ||
+        name.includes("session") ||
+        name.includes("access") ||
+        name.includes("refresh")
+      )
+    })
+
+    // More comprehensive session detection
+    const hasAuthCookies = authCookies.length > 0
+    const hasLocalStorageIndicator = request.headers.get("x-has-auth") === "true" // We'll set this from client
 
     console.log(
-      `Middleware: ${pathname}, HasSession: ${hasSession}, AuthCookies: ${authCookies.length}, Protected: ${isProtectedPath}, Auth: ${isAuthPath}`,
+      `Middleware: ${pathname}, AuthCookies: ${authCookies.length}, CookieNames: [${authCookies.map((c) => c.name).join(", ")}], Protected: ${isProtectedPath}, Auth: ${isAuthPath}`,
     )
 
-    // If we're on a protected path and there's any doubt about auth status, let the client handle it
-    // This prevents redirect loops while the client-side auth is initializing
-    if (isProtectedPath && !hasSession) {
-      // Only redirect if we're certain there's no session
-      // Add a small delay to allow client-side auth to initialize
-      const hasAnyAuthCookie = request.cookies
-        .getAll()
-        .some(
-          (cookie) =>
-            cookie.name.toLowerCase().includes("auth") ||
-            cookie.name.toLowerCase().includes("session") ||
-            cookie.name.toLowerCase().includes("supabase") ||
-            cookie.name.toLowerCase().includes("sb-"),
-        )
+    // For protected paths, be more lenient - let client-side handle auth if there's any doubt
+    if (isProtectedPath) {
+      // Only redirect if we're absolutely sure there's no authentication
+      // This prevents redirect loops while client-side auth is initializing
+      if (!hasAuthCookies && !hasLocalStorageIndicator) {
+        // Add a delay header to prevent immediate redirects
+        const hasRecentRedirect = request.headers.get("referer")?.includes("/auth/login")
 
-      if (!hasAnyAuthCookie) {
-        console.log(`Redirecting unauthenticated user from ${pathname} to login`)
-        const redirectUrl = new URL("/auth/login", request.url)
-        redirectUrl.searchParams.set("next", pathname)
-        return NextResponse.redirect(redirectUrl)
+        if (!hasRecentRedirect) {
+          console.log(`Redirecting unauthenticated user from ${pathname} to login`)
+          const redirectUrl = new URL("/auth/login", request.url)
+          redirectUrl.searchParams.set("next", pathname)
+          return NextResponse.redirect(redirectUrl)
+        } else {
+          console.log(`Skipping redirect to prevent loop - letting client handle auth`)
+        }
       } else {
-        console.log(`Allowing access to ${pathname} - auth cookies present, letting client handle`)
+        console.log(`Allowing access to ${pathname} - auth indicators present`)
       }
     }
 
-    // If user is signed in and trying to access auth pages, redirect to profile
-    if (hasSession && isAuthPath) {
+    // If user has auth cookies and trying to access auth pages, redirect to profile
+    if (hasAuthCookies && isAuthPath) {
       console.log(`Redirecting authenticated user from ${pathname} to profile`)
       return NextResponse.redirect(new URL("/profile", request.url))
     }
@@ -89,7 +87,7 @@ export async function middleware(request: NextRequest) {
       )
     }
 
-    // For non-API routes, allow the request to continue
+    // For non-API routes, allow the request to continue to prevent blocking
     return NextResponse.next()
   }
 }

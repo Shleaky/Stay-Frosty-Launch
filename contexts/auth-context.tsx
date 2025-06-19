@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { createContext, useContext, useEffect, useState, useRef } from "react"
 import type { Session, User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
@@ -31,9 +30,6 @@ const defaultAuthContext: AuthContextType = {
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContext)
 
-// Global flag to prevent multiple auth context initializations
-let globalAuthInitialized = false
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -42,15 +38,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const mountedRef = useRef(true)
   const subscriptionRef = useRef<any>(null)
+  const initializedRef = useRef(false)
 
   useEffect(() => {
-    // Prevent multiple initializations globally
-    if (globalAuthInitialized || typeof window === "undefined") {
-      setIsLoading(false)
+    // Prevent multiple initializations
+    if (initializedRef.current || typeof window === "undefined") {
       return
     }
 
-    globalAuthInitialized = true
+    initializedRef.current = true
 
     const initializeAuth = async () => {
       try {
@@ -82,67 +78,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(initialSession?.user || null)
         }
 
-        // Set up auth state listener
-        console.log("Setting up auth state listener...")
-        const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (event, session) => {
-          if (!mountedRef.current) return
+        // Set up auth state listener only once
+        if (!subscriptionRef.current) {
+          console.log("Setting up auth state listener...")
+          const {
+            data: { subscription },
+          } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (!mountedRef.current) return
 
-          console.log("Auth state changed:", event, session?.user?.email || "No user")
+            console.log("Auth state changed:", event, session?.user?.email || "No user")
 
-          // Handle different auth events
-          switch (event) {
-            case "INITIAL_SESSION":
-              // Skip if we already have the same session
-              if (session?.user?.id === user?.id) return
-              setSession(session)
-              setUser(session?.user || null)
-              break
+            // Handle different auth events
+            switch (event) {
+              case "INITIAL_SESSION":
+                // Skip if we already processed this session
+                return
 
-            case "SIGNED_IN":
-              console.log("User signed in:", session?.user?.email)
-              setSession(session)
-              setUser(session?.user || null)
+              case "SIGNED_IN":
+                console.log("User signed in:", session?.user?.email)
+                setSession(session)
+                setUser(session?.user || null)
 
-              // Handle redirects after sign in
-              const urlParams = new URLSearchParams(window.location.search)
-              const nextUrl = urlParams.get("next")
+                // Handle redirects after sign in
+                const urlParams = new URLSearchParams(window.location.search)
+                const nextUrl = urlParams.get("next")
 
-              if (nextUrl && nextUrl.startsWith("/")) {
-                router.replace(nextUrl)
-              } else if (window.location.pathname.startsWith("/auth/")) {
-                router.replace("/profile")
-              }
-              break
+                if (nextUrl && nextUrl.startsWith("/")) {
+                  router.replace(nextUrl)
+                } else if (window.location.pathname.startsWith("/auth/")) {
+                  router.replace("/profile")
+                }
+                break
 
-            case "SIGNED_OUT":
-              console.log("User signed out, clearing state")
-              setUser(null)
-              setSession(null)
+              case "SIGNED_OUT":
+                console.log("User signed out, clearing state")
+                setUser(null)
+                setSession(null)
 
-              // Only redirect if we're on a protected route
-              const currentPath = window.location.pathname
-              const protectedPaths = ["/profile", "/bookings", "/booking", "/admin"]
+                // Only redirect if we're on a protected route
+                const currentPath = window.location.pathname
+                const protectedPaths = ["/profile", "/bookings", "/booking", "/admin"]
 
-              if (protectedPaths.some((path) => currentPath.startsWith(path))) {
-                router.replace(`/auth/login?next=${encodeURIComponent(currentPath)}`)
-              }
-              break
+                if (protectedPaths.some((path) => currentPath.startsWith(path))) {
+                  router.replace(`/auth/login?next=${encodeURIComponent(currentPath)}`)
+                }
+                break
 
-            case "TOKEN_REFRESHED":
-              console.log("Token refreshed")
-              setSession(session)
-              setUser(session?.user || null)
-              break
+              case "TOKEN_REFRESHED":
+                console.log("Token refreshed")
+                setSession(session)
+                setUser(session?.user || null)
+                break
 
-            default:
-              setSession(session)
-              setUser(session?.user || null)
-          }
-        })
+              default:
+                setSession(session)
+                setUser(session?.user || null)
+            }
+          })
 
-        subscriptionRef.current = subscription
+          subscriptionRef.current = subscription
+        }
       } catch (err) {
         console.error("Unexpected error initializing auth:", err)
         if (mountedRef.current) {
@@ -163,10 +158,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mountedRef.current = false
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe()
+        subscriptionRef.current = null
       }
-      globalAuthInitialized = false
+      initializedRef.current = false
     }
-  }, [router, user?.id])
+  }, [router])
 
   const signUp = async (email: string, password: string, metadata: any) => {
     try {
