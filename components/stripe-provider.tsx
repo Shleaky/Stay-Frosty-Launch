@@ -1,33 +1,41 @@
 "use client"
 
-import { Elements } from "@stripe/react-stripe-js"
-import { loadStripe } from "@stripe/stripe-js"
-import type { ReactNode } from "react"
+import type React from "react"
 
-// Make sure to call loadStripe outside of a component's render to avoid
-// recreating the Stripe object on every render.
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+import { useEffect, useState } from "react"
+import { loadStripe, type Stripe } from "@stripe/stripe-js"
+import { Elements } from "@stripe/react-stripe-js"
 
 interface StripeProviderProps {
-  children: ReactNode
-  clientSecret: string
+  children: React.ReactNode
 }
 
-export function StripeProvider({ children, clientSecret }: StripeProviderProps) {
+// Ensure your publishable key is correctly set as an environment variable
+const NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+
+export function StripeProvider({ children }: StripeProviderProps) {
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
+
+  useEffect(() => {
+    if (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+      setStripePromise(loadStripe(NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY))
+    } else {
+      console.error(
+        "Stripe publishable key is not set. Please set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable.",
+      )
+    }
+  }, [])
+
+  if (!stripePromise) {
+    // You can render a loading state here if needed, or null
+    return null
+  }
+
+  // The options object should also be stable or memoized if it's complex.
+  // For simple options, defining it here is fine.
   const options = {
-    clientSecret,
-    appearance: {
-      theme: "night" as const,
-      variables: {
-        colorPrimary: "#5eff45",
-        colorBackground: "#000000",
-        colorText: "#ffffff",
-        colorDanger: "#ff3a76",
-        fontFamily: "Inter, system-ui, sans-serif",
-        spacingUnit: "4px",
-        borderRadius: "8px",
-      },
-    },
+    // clientSecret will be passed later when creating PaymentIntent or SetupIntent
+    // appearance: { theme: 'stripe' }, // Example appearance
   }
 
   return (

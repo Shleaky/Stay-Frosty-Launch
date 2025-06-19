@@ -32,15 +32,15 @@ export default function GlobalError({
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Something went wrong</AlertTitle>
             <AlertDescription>
-              {error.message || "An unexpected error occurred. Please try again later."}
+              \{error.message || "An unexpected error occurred. Please try again later."\}
             </AlertDescription>
           </Alert>
 
           <div className="flex gap-4">
-            <Button onClick={() => reset()} variant="default">
+            <Button onClick=\{() => reset()\} variant="default">
               Try again
             </Button>
-            <Button onClick={() => router.push("/")} variant="outline">
+            <Button onClick=\{() => router.push("/")\} variant="outline">
               Go to homepage
             </Button>
           </div>
@@ -48,4 +48,5 @@ export default function GlobalError({
       </body>
     </html>
   )
+  \
 }
