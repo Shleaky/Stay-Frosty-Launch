@@ -1,22 +1,36 @@
-"use server"
+import { cookies } from "next/headers"
+import { createServerClient } from "@/lib/supabase/server"
+import { redirect } from "next/navigation"
 
-import { getBrowserClient } from "@/lib/supabase"
+export async function actionLoginWithGithub() {
+  const cookieStore = cookies()
+  const supabase = createServerClient(cookieStore)
 
-export async function checkEmailExists(email: string) {
-  try {
-    const supabase = getBrowserClient()
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "github",
+    options: {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    },
+  })
 
-    // Check if email exists in auth.users table
-    const { data, error } = await supabase.rpc("check_email_exists", { email_to_check: email })
-
-    if (error) {
-      console.error("Error checking email:", error)
-      return { exists: false, error: error.message }
-    }
-
-    return { exists: data || false, error: null }
-  } catch (err) {
-    console.error("Unexpected error checking email:", err)
-    return { exists: false, error: "Failed to check email" }
+  if (error) {
+    console.log(error)
+    return
   }
+
+  redirect(data.url)
+}
+
+export async function actionSignOut() {
+  const cookieStore = cookies()
+  const supabase = createServerClient(cookieStore)
+
+  const { error } = await supabase.auth.signOut()
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  return redirect("/")
 }

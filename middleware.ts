@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createServerClient } from "@supabase/ssr"
 import type { CookieOptions } from "@supabase/ssr"
+import { createServerClient as createMiddlewareClient } from "@supabase/ssr"
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({
@@ -19,7 +19,7 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createMiddlewareClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       get(name: string) {
         return request.cookies.get(name)?.value
