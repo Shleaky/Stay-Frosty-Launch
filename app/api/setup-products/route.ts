@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase"
+import { cookies } from "next/headers"
+import { createServerClient } from "@/lib/supabase/server"
 
 export async function POST() {
   try {
-    const supabase = createServerClient()
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
 
     // First, check what tables already exist
     const { data: existingTables, error: checkError } = await supabase

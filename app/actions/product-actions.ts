@@ -1,6 +1,7 @@
 "use server"
 
-import { createServerClient } from "@/lib/supabase"
+import { cookies } from "next/headers"
+import { createServerClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import Stripe from "stripe"
 import { getProductById } from "@/lib/product-data"
@@ -60,7 +61,8 @@ export async function createProductOrder({
       }
     }
 
-    const supabase = createServerClient()
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
 
     console.log("Creating order in database...")
 
@@ -191,7 +193,8 @@ export async function updateOrderPaymentStatus(orderId: string, paymentIntentId:
       }
     }
 
-    const supabase = createServerClient()
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
 
     const { error } = await supabase
       .from("product_orders")
@@ -226,7 +229,8 @@ export async function getUserProductOrders(userId: string) {
       return { success: false, error: "User ID is required" }
     }
 
-    const supabase = createServerClient()
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
 
     const { data: orders, error } = await supabase
       .from("product_orders")

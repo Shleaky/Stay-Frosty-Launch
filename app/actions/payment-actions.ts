@@ -1,7 +1,8 @@
 "use server"
 
 import Stripe from "stripe"
-import { createServerClient } from "@/lib/supabase"
+import { cookies } from "next/headers"
+import { createServerClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { paymentSchema, validate } from "@/lib/validators"
 
@@ -19,7 +20,8 @@ export async function createPaymentIntent(bookingId: string, amount: number) {
     }
 
     // Fetch the booking to verify it exists and get details
-    const supabase = createServerClient()
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
     const { data: booking, error: bookingError } = await supabase
       .from("slushie_bookings")
       .select("*")
@@ -71,7 +73,8 @@ export async function updateBookingPaymentStatus(bookingId: string, paymentInten
       }
     }
 
-    const supabase = createServerClient()
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
 
     const { error } = await supabase
       .from("slushie_bookings")

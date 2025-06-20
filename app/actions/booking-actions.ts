@@ -1,6 +1,7 @@
 "use server"
 
-import { createServerClient } from "@/lib/supabase"
+import { cookies } from "next/headers"
+import { createServerClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { bookingFormSchema, validate } from "@/lib/validators"
 
@@ -28,7 +29,8 @@ export async function createSlushieBooking(formData: SlushieBookingFormData) {
       return { success: false, error: "Validation failed", validationErrors: validation.errors }
     }
 
-    const supabase = createServerClient()
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
 
     const bookingData = {
       user_id: formData.userId,
@@ -70,7 +72,8 @@ export async function getUserSlushieBookings(userId: string) {
       return { success: false, error: "User ID is required" }
     }
 
-    const supabase = createServerClient()
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
 
     const { data, error } = await supabase
       .from("slushie_bookings")
@@ -96,7 +99,8 @@ export async function cancelSlushieBooking(bookingId: string, userId: string) {
       return { success: false, error: "Booking ID and User ID are required" }
     }
 
-    const supabase = createServerClient()
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
 
     // First verify that this booking belongs to the user
     const { data: bookingData, error: fetchError } = await supabase
