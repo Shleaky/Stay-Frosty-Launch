@@ -1,36 +1,52 @@
-import { cookies } from "next/headers"
-import { createServerClient } from "@/lib/supabase/server"
+"use server"
+
+import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
 
-export async function actionLoginWithGithub() {
-  const cookieStore = cookies()
-  const supabase = createServerClient(cookieStore)
+export async function login(formData: FormData) {
+  const supabase = await createClient()
 
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "github",
-    options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-    },
-  })
-
-  if (error) {
-    console.log(error)
-    return
+  // type-casting here for convenience
+  // in practice, you should validate your inputs
+  const data = {
+    email: formData.get("email") as string,
+    password: formData.get("password") as string,
   }
 
-  redirect(data.url)
+  const { error } = await supabase.auth.signInWithPassword(data)
+
+  if (error) {
+    redirect("/auth/auth-error")
+  }
+
+  revalidatePath("/", "layout")
+  redirect("/")
 }
 
-export async function actionSignOut() {
-  const cookieStore = cookies()
-  const supabase = createServerClient(cookieStore)
+export async function signup(formData: FormData) {
+  const supabase = await createClient()
 
-  const { error } = await supabase.auth.signOut()
-
-  if (error) {
-    console.log(error)
-    return
+  // type-casting here for convenience
+  // in practice, you should validate your inputs
+  const data = {
+    email: formData.get("email") as string,
+    password: formData.get("password") as string,
   }
 
-  return redirect("/")
+  const { error } = await supabase.auth.signUp(data)
+
+  if (error) {
+    redirect("/auth/auth-error")
+  }
+
+  revalidatePath("/", "layout")
+  redirect("/auth/verify")
+}
+
+export async function signOut() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  revalidatePath("/", "layout")
+  redirect("/auth/login")
 }

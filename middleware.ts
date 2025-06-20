@@ -1,88 +1,63 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
-import type { CookieOptions } from "@supabase/ssr"
-import { createServerClient as createMiddlewareClient } from "@supabase/ssr"
+import { createServerClient } from "@supabase/ssr"
+import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+  let supabaseResponse = NextResponse.next({
+    request,
   })
 
-  const supabaseUrl = process.env.SUPABASE_URL
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Middleware: Supabase URL or Anon Key not defined.")
-    // Potentially redirect to an error page or allow request if critical env vars are missing
-    return response
-  }
-
-  const supabase = createMiddlewareClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        request.cookies.set({ name, value, ...options }) // Update request cookies for subsequent operations
-        response.cookies.set({ name, value, ...options }) // Set cookie on the response
-      },
-      remove(name: string, options: CookieOptions) {
-        request.cookies.delete(name) // Update request cookies
-        response.cookies.delete({ name, ...options }) // Delete cookie on the response
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+        },
       },
     },
-  })
-
-  const {
-    data: { session },
-    error: sessionError,
-  } = await supabase.auth.getSession()
-
-  if (sessionError) {
-    console.error("Middleware: Error getting session:", sessionError.message)
-    // Decide how to handle session errors, maybe redirect to a generic error page
-  }
-
-  const { pathname } = request.nextUrl
-
-  const protectedPaths = ["/profile", "/bookings", "/booking", "/admin"]
-  const authPaths = ["/auth/login", "/auth/signup", "/auth/verify", "/auth/auth-error", "/auth/confirm-error"]
-
-  const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path))
-  const isAuthPath = authPaths.some((path) => pathname.startsWith(path))
-
-  console.log(
-    `Middleware: Path: ${pathname}, Session: ${session ? session.user.email : "None"}, Protected: ${isProtectedPath}, AuthPage: ${isAuthPath}`,
   )
 
-  if (!session && isProtectedPath) {
-    console.log(`Middleware: No session, redirecting from protected path ${pathname} to /auth/login`)
-    const redirectUrl = new URL("/auth/login", request.url)
-    redirectUrl.searchParams.set("next", pathname) // Preserve intended destination
-    return NextResponse.redirect(redirectUrl)
+  // IMPORTANT: Avoid writing any logic between createServerClient and
+  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+  // issues with users being randomly logged out.
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Protected routes
+  const protectedRoutes = ["/profile", "/bookings", "/booking"]
+  const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
+
+  if (isProtectedRoute && !user) {
+    // no user, potentially respond by redirecting the user to the login page
+    const url = request.nextUrl.clone()
+    url.pathname = "/auth/login"
+    return NextResponse.redirect(url)
   }
 
-  if (session && isAuthPath) {
-    // User is logged in but trying to access login/signup type pages
-    // Exception: /auth/verify might be needed if email isn't confirmed yet.
-    if (pathname === "/auth/verify" && !session.user.email_confirmed_at) {
-      console.log("Middleware: Authenticated user accessing /auth/verify for email confirmation.")
-    } else if (pathname !== "/auth/verify") {
-      // Allow /auth/verify if needed, otherwise redirect
-      console.log(`Middleware: Session found, redirecting from auth path ${pathname} to /profile`)
-      return NextResponse.redirect(new URL("/profile", request.url))
-    }
-  }
+  // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
+  // creating a new response object with NextResponse.next() make sure to:
+  // 1. Pass the request in it, like so:
+  //    const myNewResponse = NextResponse.next({ request })
+  // 2. Copy over the cookies, like so:
+  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
+  // 3. Change the myNewResponse object to fit your needs, but avoid changing
+  //    the cookies!
+  // 4. Finally:
+  //    return myNewResponse
+  // If this is not done, you may be causing the browser and server to go out
+  // of sync and terminate the user's session prematurely!
 
-  // Refresh session if necessary
-  // This is important to keep the session alive and cookies updated
-  if (session) {
-    await supabase.auth.refreshSession()
-  }
-
-  return response
+  return supabaseResponse
 }
 
 export const config = {
@@ -92,9 +67,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder contents (e.g. /images/, /placeholder.svg)
-     * - api routes (unless you want to protect them too)
+     * Feel free to modify this pattern to include more paths.
      */
-    "/((?!_next/static|_next/image|favicon.ico|images/|placeholder.svg|api/).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
