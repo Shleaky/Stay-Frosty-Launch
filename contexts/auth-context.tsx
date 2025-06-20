@@ -3,7 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabase/client"
+import { getBrowserClient } from "@/lib/supabase/client"
 
 interface AuthContextType {
   user: User | null
@@ -16,13 +16,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const supabase = getBrowserClient() // Initialize client here
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
       const {
         data: { session },
-      } = await supabase.auth.getSession()
+      } = await supabase.auth.getSession() // Use the initialized client
       setUser(session?.user ?? null)
       setLoading(false)
     }
@@ -33,15 +34,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Use the initialized client
       setUser(session?.user ?? null)
       setLoading(false)
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [supabase]) // Add supabase to dependency array
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut() // Use the initialized client
   }
 
   return <AuthContext.Provider value={{ user, loading, signOut }}>{children}</AuthContext.Provider>
