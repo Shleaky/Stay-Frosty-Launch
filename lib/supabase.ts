@@ -1,14 +1,9 @@
-import { cookies } from "next/headers"
-import { createServerClient as createServerClientSupabase, createServiceRoleClient } from "@/lib/supabase/server"
+"use client"
 
-// Re-export the server client function for backward compatibility
-export function createServerClient() {
-  const cookieStore = cookies()
-  return createServerClientSupabase(cookieStore)
-}
+// Re-export everything from the client and server modules for convenience
+export { getBrowserClient } from "./supabase/client"
+export { createServerClient, createServiceRoleClient } from "./supabase/server"
 
-// Re-export the service role client
-export { createServiceRoleClient }
-
-// For any legacy imports, also export the browser client
-export { getBrowserClient } from "@/lib/supabase/client"
+// For backward compatibility, also export the browser client as 'supabase'
+import { getBrowserClient } from "./supabase/client"
+export const supabase = getBrowserClient()

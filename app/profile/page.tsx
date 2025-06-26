@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { getBrowserClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase"
 import { getUserSlushieBookings } from "@/app/actions/booking-actions"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -69,32 +69,38 @@ export default function ProfilePage() {
     receive_marketing: false,
   })
   const [bookings, setBookings] = useState<any[]>([])
-  const [isPageLoading, setIsPageLoading] = useState(true) // Page specific loading
+  const [isPageLoading, setIsPageLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  // Auth check: Middleware should handle this, but client-side check is a fallback.
+  // Auth check with better handling
   useEffect(() => {
-    if (!authLoading && !user) {
-      console.log("ProfilePage: No user, redirecting to login.")
-      router.replace("/auth/login?next=/profile")
+    if (!authLoading) {
+      if (!user) {
+        console.log("ProfilePage: No user, redirecting to login.")
+        router.replace("/auth/login?next=/profile")
+      } else {
+        console.log("ProfilePage: User authenticated:", user.email)
+      }
     }
   }, [user, authLoading, router])
 
   useEffect(() => {
     if (user && !authLoading) {
-      // Fetch data only if user is available and auth is not loading
       const fetchData = async () => {
         setIsPageLoading(true)
         try {
-          const supabase = getBrowserClient()
           const { data: profile, error: profileError } = await supabase
             .from("profiles")
             .select("*")
             .eq("id", user.id)
             .single()
 
-          if (profileError) throw profileError
+          if (profileError && profileError.code !== "PGRST116") {
+            // PGRST116 is "not found" - we can handle this gracefully
+            throw profileError
+          }
+
           if (profile) {
             setProfileData({
               full_name: profile.full_name || "",
@@ -102,27 +108,42 @@ export default function ProfilePage() {
               phone: profile.phone || "",
               receive_marketing: profile.receive_marketing || false,
             })
+          } else {
+            // No profile found, use user data
+            setProfileData({
+              full_name: "",
+              email: user.email || "",
+              phone: "",
+              receive_marketing: false,
+            })
           }
 
           const bookingsResult = await getUserSlushieBookings(user.id)
-          if (!bookingsResult.success) throw new Error(bookingsResult.error || "Failed to fetch bookings")
-
-          const validBookings = (bookingsResult.data || []).filter((booking: any) => {
-            if (!booking.booking_date) return false
-            const date = safeParseDate(booking.booking_date)
-            return !!date
-          })
-          setBookings(validBookings)
+          if (!bookingsResult.success) {
+            console.warn("Failed to fetch bookings:", bookingsResult.error)
+            setBookings([]) // Set empty array instead of throwing
+          } else {
+            const validBookings = (bookingsResult.data || []).filter((booking: any) => {
+              if (!booking.booking_date) return false
+              const date = safeParseDate(booking.booking_date)
+              return !!date
+            })
+            setBookings(validBookings)
+          }
         } catch (err: any) {
           console.error("Error fetching profile page data:", err)
-          toast({ title: "Error", description: err.message || "Failed to load profile data", variant: "destructive" })
+          toast({
+            title: "Error",
+            description: err.message || "Failed to load profile data",
+            variant: "destructive",
+          })
         } finally {
           setIsPageLoading(false)
         }
       }
       fetchData()
     } else if (!authLoading && !user) {
-      setIsPageLoading(false) // Not logged in, no data to load
+      setIsPageLoading(false)
     }
   }, [user, authLoading, toast])
 
@@ -132,16 +153,14 @@ export default function ProfilePage() {
     setIsSaving(true)
     setFormError(null)
     try {
-      const supabase = getBrowserClient()
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: profileData.full_name,
-          phone: profileData.phone,
-          receive_marketing: profileData.receive_marketing,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id)
+      const { error } = await supabase.from("profiles").upsert({
+        id: user.id,
+        full_name: profileData.full_name,
+        email: profileData.email,
+        phone: profileData.phone,
+        receive_marketing: profileData.receive_marketing,
+        updated_at: new Date().toISOString(),
+      })
       if (error) throw error
       toast({ title: "Profile Updated", description: "Your profile has been successfully updated." })
     } catch (err: any) {
@@ -155,43 +174,34 @@ export default function ProfilePage() {
   const handleSignOut = async () => {
     toast({ title: "Signing out..." })
     await signOut()
-    // AuthContext's onAuthStateChange or signOut itself will handle redirect
+    router.replace("/auth/login?message=signed_out")
   }
 
   if (authLoading || (isPageLoading && user)) {
-    // Show skeleton if auth is loading OR if page data is loading for an authenticated user
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="container max-w-4xl py-12">
-          <Skeleton className="h-10 w-1/3 mb-6" /> {/* Title skeleton */}
+          <Skeleton className="h-10 w-1/3 mb-6" />
           <Card className="border border-white/10 bg-black/80 backdrop-blur-sm">
             <CardHeader>
-              <Skeleton className="h-8 w-1/2 mb-2" /> {/* Card title skeleton */}
-              <Skeleton className="h-4 w-3/4" /> {/* Card description skeleton */}
+              <Skeleton className="h-8 w-1/2 mb-2" />
+              <Skeleton className="h-4 w-3/4" />
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="space-y-2">
-                    <Skeleton className="h-4 w-1/4" /> {/* Label skeleton */}
-                    <Skeleton className="h-10 w-full" /> {/* Input skeleton */}
+                    <Skeleton className="h-4 w-1/4" />
+                    <Skeleton className="h-10 w-full" />
                   </div>
                 ))}
               </div>
-              <Skeleton className="h-6 w-1/2" /> {/* Checkbox skeleton */}
+              <Skeleton className="h-6 w-1/2" />
             </CardContent>
             <CardFooter className="flex justify-between">
-              <Skeleton className="h-10 w-24" /> {/* Button skeleton */}
-              <Skeleton className="h-10 w-32" /> {/* Button skeleton */}
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-32" />
             </CardFooter>
-          </Card>
-          <Skeleton className="h-8 w-1/2 mt-12 mb-4" /> {/* Bookings title skeleton */}
-          <Card className="border border-white/10 bg-black/80 backdrop-blur-sm">
-            <CardContent className="p-6 space-y-4">
-              {[1, 2].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </CardContent>
           </Card>
         </div>
       </div>
@@ -199,8 +209,6 @@ export default function ProfilePage() {
   }
 
   if (!user) {
-    // This case should ideally be handled by middleware redirecting before page load.
-    // If client-side redirect in useEffect hasn't fired yet, this prevents rendering.
     return null
   }
 
@@ -217,7 +225,6 @@ export default function ProfilePage() {
   return (
     <div className="flex min-h-screen bg-black py-12">
       <div className="container max-w-4xl">
-        {/* Profile Form Card */}
         <div className="relative">
           <div className="absolute inset-0 z-0 opacity-30 splatter-bg"></div>
           <Card className="relative z-10 border border-white/10 bg-black/80 backdrop-blur-sm">
@@ -300,7 +307,6 @@ export default function ProfilePage() {
           </Card>
         </div>
 
-        {/* Upcoming Bookings Card */}
         <div className="mt-8">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-white">Your Upcoming Bookings</h2>

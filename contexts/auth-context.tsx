@@ -1,9 +1,9 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import type { User } from "@supabase/supabase-js"
-import { getBrowserClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase"
 
 interface AuthContextType {
   user: User | null
@@ -18,16 +18,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const supabase = getBrowserClient()
 
   useEffect(() => {
+    let mounted = true
+
     // Get initial session
     const getInitialSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      setIsLoading(false)
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (mounted) {
+          setUser(session?.user ?? null)
+          setIsLoading(false)
+        }
+      } catch (error) {
+        console.error("Error getting initial session:", error)
+        if (mounted) {
+          setUser(null)
+          setIsLoading(false)
+        }
+      }
     }
 
     getInitialSession()
@@ -36,14 +48,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null)
-      setIsLoading(false)
+      console.log("Auth state changed:", event, session?.user?.email)
+      if (mounted) {
+        setUser(session?.user ?? null)
+        setIsLoading(false)
+      }
     })
 
-    return () => subscription.unsubscribe()
-  }, [supabase])
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -68,13 +86,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       return { error: { message: "An unexpected error occurred" } }
     }
-  }
+  }, [])
 
-  const signOut = async () => {
-    await supabase.auth.signOut()
-  }
+  const signOut = useCallback(async () => {
+    try {
+      await supabase.auth.signOut()
+      // The auth state change listener will handle updating the user state
+    } catch (error) {
+      console.error("Error signing out:", error)
+    }
+  }, [])
 
-  const resendConfirmation = async (email: string) => {
+  const resendConfirmation = useCallback(async (email: string) => {
     try {
       const { error } = await supabase.auth.resend({
         type: "signup",
@@ -84,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       return { error: { message: "Failed to resend confirmation email" } }
     }
-  }
+  }, [])
 
   return (
     <AuthContext.Provider

@@ -1,6 +1,6 @@
 "use client"
 
-import { createBrowserClient as _createBrowserClient } from "@supabase/ssr"
+import { createBrowserClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 // This is a singleton instance of the Supabase client for the browser.
@@ -25,7 +25,10 @@ export function getBrowserClient(): SupabaseClient {
   }
 
   console.log("Creating new Supabase browser client instance.")
-  clientInstance = _createBrowserClient(supabaseUrl, supabaseAnonKey)
+  clientInstance = createBrowserClient(supabaseUrl, supabaseAnonKey)
 
   return clientInstance
 }
+
+// Export a default instance for compatibility
+export const supabase = getBrowserClient()
