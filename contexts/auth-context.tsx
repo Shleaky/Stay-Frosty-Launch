@@ -7,25 +7,27 @@ import { getBrowserClient } from "@/lib/supabase/client"
 
 interface AuthContextType {
   user: User | null
-  loading: boolean
+  isLoading: boolean
+  signIn: (email: string, password: string) => Promise<{ data?: any; error?: any }>
   signOut: () => Promise<void>
+  resendConfirmation: (email: string) => Promise<{ error?: any }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const supabase = getBrowserClient() // Initialize client here
+  const [isLoading, setIsLoading] = useState(true)
+  const supabase = getBrowserClient()
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
       const {
         data: { session },
-      } = await supabase.auth.getSession() // Use the initialized client
+      } = await supabase.auth.getSession()
       setUser(session?.user ?? null)
-      setLoading(false)
+      setIsLoading(false)
     }
 
     getInitialSession()
@@ -34,19 +36,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Use the initialized client
       setUser(session?.user ?? null)
-      setLoading(false)
+      setIsLoading(false)
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase]) // Add supabase to dependency array
+  }, [supabase])
 
-  const signOut = async () => {
-    await supabase.auth.signOut() // Use the initialized client
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        // Check if it's an email confirmation error
+        if (error.message.includes("Email not confirmed")) {
+          return {
+            error: {
+              ...error,
+              needsConfirmation: true,
+              email: email,
+            },
+          }
+        }
+        return { error }
+      }
+
+      return { data }
+    } catch (err) {
+      return { error: { message: "An unexpected error occurred" } }
+    }
   }
 
-  return <AuthContext.Provider value={{ user, loading, signOut }}>{children}</AuthContext.Provider>
+  const signOut = async () => {
+    await supabase.auth.signOut()
+  }
+
+  const resendConfirmation = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: email,
+      })
+      return { error }
+    } catch (err) {
+      return { error: { message: "Failed to resend confirmation email" } }
+    }
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        signIn,
+        signOut,
+        resendConfirmation,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {
